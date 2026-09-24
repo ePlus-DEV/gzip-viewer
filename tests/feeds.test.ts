@@ -51,7 +51,7 @@ describe('record parsing and links', () => {
     expect(determineFormat(new URL('https://example.com/feeds/products-en-1.jsonl.gz'),
       '{"sku":"1"}')).toBe('jsonl');
     expect(determineFormat(new URL('https://example.com/llms.txt'), '# AI discovery'))
-      .toBe('text');
+      .toBe('llms');
   });
   it('checks missing product metadata without rejecting valid JSON', () => {
     expect(productIssues({sku:'5', title:'Widget', price:{value:'12.50', currency:'EUR'}})).toEqual([]);
