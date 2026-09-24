@@ -5,35 +5,44 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>GZIP JSONL Viewer</title>
   <style>
-    :root { color-scheme: light dark; }
-    body { margin: 0; font: 14px system-ui, sans-serif; }
-    header { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 10px; padding: 14px; border-bottom: 1px solid #9995; background: Canvas; }
-    #search { flex: 1; min-width: 160px; }
-    input, select, button { padding: 8px; border: 1px solid #9999; border-radius: 6px; background: Canvas; color: CanvasText; }
-    button { cursor: pointer; }
-    #status { padding: 10px 14px; color: #777; overflow-wrap: anywhere; }
-    #source { font-size: 12px; overflow-wrap: anywhere; padding: 0 14px; }
-    #items { padding: 0 14px 30px; }
-    details { border-bottom: 1px solid #9995; padding: 8px 0; }
-    summary { cursor: pointer; overflow-wrap: anywhere; }
-    pre { white-space: pre-wrap; word-break: break-word; font: 12px ui-monospace, Consolas, monospace; }
-    .error { color: #c44; }
+    :root{color-scheme:light dark}
+    body{margin:0;font:14px system-ui,sans-serif}
+    header{position:sticky;top:0;z-index:3;display:flex;flex-wrap:wrap;gap:10px;padding:14px;border-bottom:1px solid #9995;background:Canvas}
+    #search{flex:1;min-width:180px}
+    input,select,button{padding:8px;border:1px solid #9999;border-radius:6px;background:Canvas;color:CanvasText}
+    button{cursor:pointer}
+    #source,#status,#summary{padding:10px 14px;overflow-wrap:anywhere}
+    #source{font-size:12px}
+    #summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+    .metric{border:1px solid #9994;border-radius:8px;padding:10px}
+    .metric b{display:block;font-size:18px}
+    .ok{color:#2a9d54}.warn{color:#d18b00}.error{color:#d34}
+    #items{padding:0 14px 30px}
+    details{border-bottom:1px solid #9995;padding:8px 0}
+    summary{cursor:pointer;overflow-wrap:anywhere}
+    pre{white-space:pre-wrap;word-break:break-word;font:12px ui-monospace,Consolas,monospace}
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th,td{padding:8px;border-bottom:1px solid #9994;text-align:left;vertical-align:top}
+    a{color:LinkText}
+    .toolbar-note{font-size:12px;opacity:.7;align-self:center}
   </style>
 </head>
 <body>
   <header>
-    <input id="search" placeholder="Filter records..." aria-label="Filter records">
+    <input id="search" placeholder="Filter records / shards..." aria-label="Filter records">
     <select id="limit" aria-label="Display limit">
-      <option value="100">100 records</option>
-      <option value="500" selected>500 records</option>
-      <option value="1000">1,000 records</option>
-      <option value="5000">5,000 records</option>
-      <option value="0">All records</option>
+      <option value="100">100</option>
+      <option value="500" selected>500</option>
+      <option value="1000">1,000</option>
+      <option value="5000">5,000</option>
+      <option value="0">All</option>
     </select>
     <button id="reload">Reload</button>
+    <span class="toolbar-note" id="mode"></span>
   </header>
   <div id="source"></div>
   <div id="status" aria-live="polite">Loading...</div>
+  <section id="summary"></section>
   <main id="items"></main>
   <script src="viewer.js"></script>
 </body>
