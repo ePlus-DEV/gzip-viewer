@@ -174,13 +174,37 @@ function renderJsonl() {
     pre.textContent = row.valid ? JSON.stringify(row.data, null, 2) : row.raw + "\n\nParse error: " + row.error;
     if (!row.valid) pre.className = "error";
 
-    if (row.valid && row.data && typeof row.data === "object" && row.data.url) {
-      const pageLink = document.createElement("a");
-      pageLink.href = row.data.url;
-      pageLink.target = "_blank";
-      pageLink.rel = "noreferrer";
-      pageLink.textContent = "Open product page";
-      details.append(summary, pageLink, pre);
+    if (row.valid && row.data && typeof row.data === "object") {
+      const links = document.createElement("div");
+      links.style.display = "flex";
+      links.style.gap = "12px";
+      links.style.margin = "8px 0";
+
+      if (row.data.url) {
+        const pageLink = document.createElement("a");
+        pageLink.href = row.data.url;
+        pageLink.target = "_blank";
+        pageLink.rel = "noreferrer";
+        pageLink.textContent = "Open product page";
+        links.appendChild(pageLink);
+      }
+
+      if (row.data.sku) {
+        const match = new URL(sourceUrl).pathname.match(/products-([a-z]{2})-\d+\.jsonl\.gz$/i);
+        if (match) {
+          const lang = match[1].toLowerCase();
+          const u = new URL(sourceUrl);
+          const singleProductUrl = u.origin + "/" + lang + "/products/" + encodeURIComponent(row.data.sku) + ".json";
+          const productJsonLink = document.createElement("a");
+          productJsonLink.href = viewerLink(singleProductUrl);
+          productJsonLink.textContent = "Open single product JSON";
+          links.appendChild(productJsonLink);
+        }
+      }
+
+      details.append(summary);
+      if (links.childNodes.length) details.appendChild(links);
+      details.appendChild(pre);
     } else {
       details.append(summary, pre);
     }
