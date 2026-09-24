@@ -123,7 +123,7 @@ export function auditFeedIndex(value: unknown, source: string): FeedIndexAudit {
     seen.add(url.href);
 
     const match = url.pathname.match(/products-([a-z]{2})-\d+\.jsonl\.gz$/i);
-    if (match && language && match[1].toLowerCase() !== language) {
+    if (match?.[1] && language && match[1].toLowerCase() !== language) {
       issues.push({severity: 'warning', message: 'Shard #' + n + ': URL language differs from declared language.'});
     }
     if (!/\.(?:jsonl|ndjson)(?:\.gz)?$/i.test(url.pathname)) {
@@ -170,7 +170,7 @@ export function productJsonUrl(shardUrl: string, sku: unknown): string | null {
     return null;
   }
   const match = url.pathname.match(/(?:^|\/)products-([a-z]{2})-\d+\.(?:jsonl|ndjson)(?:\.gz)?$/i);
-  if (!match) return null;
+  if (!match?.[1]) return null;
   return url.origin + '/' + match[1].toLowerCase() + '/products/' + encodeURIComponent(String(sku)) + '.json';
 }
 
