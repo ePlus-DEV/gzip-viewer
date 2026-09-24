@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SEO Cross-test Runner</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <header>
+    <strong>SEO Cross-test Runner</strong>
+    <a id="browse" href="#">Explore llms.txt</a>
+  </header>
+  <main>
+    <section class="panel">
+      <h1>Run SEO cross-tests</h1>
+      <p>Start at a site's llms.txt, discover the product feed index, verify published shards, compare languages and inspect product endpoints.</p>
+      <label for="site">Website or llms.txt URL</label>
+      <input id="site" type="url" placeholder="https://example.com/llms.txt" required>
+      <div class="settings">
+        <label for="scope">Scope
+          <select id="scope">
+            <option value="quick">Quick — first shared shard per language, sample 3 products</option>
+            <option value="full">Full — all published shards, sample 3 products per shard</option>
+          </select>
+        </label>
+        <label for="reference">Reference language
+          <select id="reference"><option value="en">en (default)</option></select>
+        </label>
+        <label for="links">Links from llms.txt
+          <select id="links">
+            <option value="15">Check first 15 concrete links</option>
+            <option value="50">Check first 50 concrete links</option>
+            <option value="0">Check all concrete links</option>
+          </select>
+        </label>
+      </div>
+      <div class="actions">
+        <button id="run" type="button">▶ Run Tests</button>
+        <button id="stop" type="button" disabled>■ Stop</button>
+        <button id="export" type="button" disabled>Export JSON report</button>
+      </div>
+      <p class="help">Run uses the current Chrome session. Full mode can transfer large feeds and may take substantial time. Leave this tab open. Test data is not uploaded anywhere.</p>
+    </section>
+    <section class="panel" id="result" aria-live="polite">
+      <h2>Test results <span id="summary"></span></h2>
+      <progress id="progress" max="100" value="0"></progress>
+      <p id="activity">Ready. Choose a scope and press Run Tests.</p>
+      <div class="totals">
+        <div><strong id="passed">0</strong><span>PASS</span></div>
+        <div><strong id="failed">0</strong><span>FAIL</span></div>
+        <div><strong id="warnings">0</strong><span>WARNING</span></div>
+        <div><strong id="blocked">0</strong><span>BLOCKED</span></div>
+        <div><strong id="notrun">0</strong><span>NOT RUN</span></div>
+      </div>
+      <div id="findings"></div>
+    </section>
+  </main>
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

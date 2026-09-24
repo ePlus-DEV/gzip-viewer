@@ -41,3 +41,16 @@ No private or staging URL is hard-coded in the source. GZIP responses are decode
 - `<all_urls>` host permission supports arbitrary user-entered HTTP(S) endpoints, including authenticated sites subject to Chrome cookie/SameSite policies.
 - The full shard is currently parsed into memory; avoid opening the entire multi-shard catalog at once.
 - Unit tests do not contact your live/private endpoints; verify those locally in a signed-in browser.
+
+## In-extension cross-test runner
+
+Use the **▶ Run Tests** button in the popup or resource viewer. This opens a dedicated WXT test-runner tab (not GitHub Actions), starts at the selected website's `/llms.txt`, and runs live HTTP/data checks with your Chrome session.
+
+- **Quick:** first shard number shared by all published feed languages, three product JSON + product-detail/JSON-LD samples per checked language.
+- **Full:** all published shard numbers, three samples per shard/language; large catalogs transfer significant data and take time.
+- Checks include llms.txt links, same-domain/redirect checks, published index and shard counts, actual GZIP decompression/JSONL parsing, 50k item limits, duplicate SKUs, cross-language record counts/SKU order/invariant fields, and sampled single-product JSON + server-rendered Product JSON-LD.
+- Click **Stop** to cancel outstanding fetches, and **Export JSON report** to preserve all PASS/FAIL/WARNING/BLOCKED/NOT RUN findings.
+- Link and XML checks use explicit per-run limits. When not every URL/product can be verified the runner reports NOT RUN, never an unearned PASS.
+- Live site tests need Chrome network access. A full database-to-feed SKU coverage proof still needs a database/source export and is explicitly marked NOT RUN.
+
+Source URLs are entered by the user. No staging URL, secret or credentials are committed into this repository.

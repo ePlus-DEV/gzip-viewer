@@ -6,6 +6,7 @@ const form = document.querySelector<HTMLFormElement>('#openForm')!;
 const input = document.querySelector<HTMLInputElement>('#url')!;
 const lastButton = document.querySelector<HTMLButtonElement>('#lastFeed')!;
 const directButton = document.querySelector<HTMLButtonElement>('#openDirect')!;
+const runTestsButton = document.querySelector<HTMLButtonElement>('#runTests')!;
 const errorEl = document.querySelector<HTMLParagraphElement>('#error')!;
 
 async function openViewer(raw: string, llmsFirst: boolean): Promise<void> {
@@ -43,3 +44,18 @@ form.addEventListener('submit', event => {
 });
 directButton.addEventListener('click', () => { void openViewer(input.value, false); });
 lastButton.addEventListener('click', () => { void openViewer(input.value, false); });
+
+runTestsButton.addEventListener('click', async () => {
+  let url: URL;
+  try { url = httpUrl(input.value.trim()); }
+  catch {
+    errorEl.textContent = 'Enter a valid HTTP or HTTPS site URL.';
+    return;
+  }
+  const root = new URL('/llms.txt', url.origin).href;
+  await browser.storage.local.set({lastUrl: root});
+  await browser.tabs.create({
+    url: browser.runtime.getURL('/test-runner.html') + '?url=' + encodeURIComponent(root),
+  });
+  window.close();
+});

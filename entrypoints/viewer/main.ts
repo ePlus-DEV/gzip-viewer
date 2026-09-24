@@ -528,3 +528,9 @@ searchEl.addEventListener('input', render);
 limitEl.addEventListener('change', render);
 reloadEl.addEventListener('click', () => { void load(); });
 void load();
+
+document.querySelector<HTMLButtonElement>('#runTests')!.addEventListener('click', () => {
+  if (!rawUrl) return;
+  const url = new URL('/llms.txt', httpUrl(rawUrl).origin);
+  location.assign(browser.runtime.getURL('/test-runner.html') + '?url=' + encodeURIComponent(url.href));
+});
