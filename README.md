@@ -1,67 +1,38 @@
 # GZIP JSONL Viewer
 
-Chrome extension (Manifest V3) for inspecting and validating remote product feeds directly in Chrome without saving `.gz` files to Downloads.
+Chrome extension built with [WXT](https://wxt.dev/) (Manifest V3, vanilla TypeScript). Open remote feed indexes, decompress GZIP shards in Chrome and inspect individual product JSON without saving a download.
 
-## Develop branch
+## Develop locally
 
-The `develop` branch adds feed-aware validation:
+1. Install **Node.js 22+**, then `npm install`.
+2. Use `npm run dev` for development or `npm run build` for a distributable Chrome extension.
+3. Run `npm run typecheck` and `npm test` before publishing.
+4. Load `.output/chrome-mv3` via `chrome://extensions` → Developer mode → Load unpacked.
+5. Run `npm run zip` to package the production extension.
 
-- Opens a product feed index such as `/feeds/products.json`.
-- Detects `shards[]`, language, URL, `last_modified`, declared shard count and total product count.
-- Makes every shard directly openable in the extension.
-- Fetches and GZIP-decompresses `.jsonl.gz` shards in browser memory.
-- Parses each JSONL record and reports malformed lines.
-- Searches records without extracting a file manually.
-- For a shard named `products-{lang}-{shard}.jsonl.gz`, derives the corresponding single-product endpoint from each record's `sku`:
-  `/{lang}/products/{sku}.json`.
-- Opens single-product JSON in the same viewer.
-- Opens the public product page when a record contains a `url`.
-- Also supports ordinary JSON, JSONL, NDJSON and plain-text resources.
+## Inspect a feed
 
-This is intended for checking feed links published in machine-readable discovery files such as `llms.txt`.
+1. Enter an index URL, for example `https://example.com/feeds/products.json`, in the popup.
+2. Check declared product/shard counts, languages, duplicate URLs and malformed shard metadata.
+3. Choose **View decoded** to fetch a `.jsonl.gz` shard and expand parsed JSONL records.
+4. For recognized shard paths, **Open single product JSON** constructs `/{lang}/products/{sku}.json` on the source origin.
+5. Other JSON documents and `.txt` files can be opened in the same viewer.
 
-## Install
+No private or staging URL is hard-coded in the source. GZIP responses are decoded in browser memory; if the browser has already handled Content-Encoding, plain text is read directly.
 
-1. Clone this repository.
-2. Checkout `develop`.
-3. Open `chrome://extensions`.
-4. Enable **Developer mode**.
-5. Click **Load unpacked**.
-6. Select the repository directory.
-7. Click the extension icon and paste the feed/index URL.
+## Project structure
 
-Example:
+- `wxt.config.ts`: manifest metadata and permissions (WXT generates `manifest.json`).
+- `entrypoints/popup/`: extension URL form.
+- `entrypoints/viewer/`: standalone unlisted WXT viewer page, built as `/viewer.html`.
+- `lib/feed.ts`: feed-index metadata validation, product warnings, JSONL parsing and URL derivation.
+- `lib/decompress.ts`: raw GZIP detection/decompression.
+- `tests/`: Vitest tests covering JSONL, indexing, link derivation, and GZIP.
+- `.github/workflows/ci.yml`: typecheck, test and build on pull requests and branch updates.
 
-```text
-https://example.com/feeds/products.json
-```
+## Privacy and limitations
 
-A shard can then be opened through **View decoded** without downloading and manually extracting it.
-
-## Supported patterns
-
-```text
-/feeds/products.json
-/feeds/products-{lang}-{shard}.jsonl.gz
-/{lang}/products/{sku}.json
-```
-
-The extension discovers actual shard URLs from the index. It does not need to guess shard numbers.
-
-## Privacy and access
-
-- No third-party analytics, upload services or external JavaScript.
-- Data is fetched directly from the URL by your Chrome browser.
-- GZIP content is decompressed in memory with Chrome's built-in `DecompressionStream`.
-- No archive is intentionally written to the Downloads folder.
-- Authenticated endpoints are requested with `credentials: include`, subject to Chrome cookie and SameSite rules.
-- `<all_urls>` host permission is required because the URL is selected by the user.
-- Large shards are currently loaded into memory in full.
-
-## Files
-
-- `manifest.json` — Manifest V3 extension configuration
-- `popup.html`, `popup.js` — URL input
-- `viewer.html`, `viewer.js` — index validation, GZIP decompression, JSON/JSONL rendering
-
-No build step or external dependencies.
+- No analytics, third-party uploads or explicit file writes to Downloads. Chrome still retrieves the response in memory.
+- `<all_urls>` host permission supports arbitrary user-entered HTTP(S) endpoints, including authenticated sites subject to Chrome cookie/SameSite policies.
+- The full shard is currently parsed into memory; avoid opening the entire multi-shard catalog at once.
+- Unit tests do not contact your live/private endpoints; verify those locally in a signed-in browser.

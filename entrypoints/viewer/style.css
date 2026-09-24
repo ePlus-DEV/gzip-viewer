@@ -1,0 +1,31 @@
+:root { font-family: system-ui, sans-serif; color-scheme: light dark; }
+* { box-sizing: border-box; }
+body { margin: 0; color: CanvasText; background: Canvas; font-size: 14px; }
+header { position: sticky; top: 0; z-index: 3; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; align-items: center; padding: 16px 22px; border-bottom: 1px solid color-mix(in srgb, CanvasText 18%, transparent); background: Canvas; }
+.header-title { display: flex; align-items: center; gap: 12px; font-size: 16px; }
+#mode { color: #27805a; font-size: 12px; font-weight: 700; }
+.controls { display: flex; flex: 1; gap: 8px; max-width: 800px; }
+input, select, button { min-width: 0; padding: 9px 10px; border: 1px solid #9998; border-radius: 8px; color: CanvasText; background: Canvas; }
+#search { flex: 1; }
+button { cursor: pointer; background: #2269d7; color: white; border-color: #2269d7; }
+#source { padding: 10px 22px 2px; color: #78818c; font: 12px ui-monospace, monospace; overflow-wrap: anywhere; }
+#status { padding: 10px 22px; }
+#status.ok { color: #27805a; }
+#status.warn { color: #b57800; }
+#status.error { color: #ce3434; }
+#summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; padding: 0 22px 14px; }
+.metric { padding: 14px; border: 1px solid #9995; border-radius: 9px; }
+.metric strong { display: block; font-size: 20px; margin-bottom: 5px; }
+.metric span { color: #777; }
+#items { padding: 0 22px 30px; }
+.issue { display: block; border-left: 3px solid #d5a033; padding: 8px 12px; margin: 4px 0; background: color-mix(in srgb, CanvasText 4%, transparent); }
+.issue.error { border-left-color: #cd4949; }
+table { width: 100%; border-collapse: collapse; text-align: left; }
+th, td { padding: 10px 8px; border-bottom: 1px solid #9994; vertical-align: top; overflow-wrap: anywhere; }
+th { position: sticky; top: 72px; background: Canvas; }
+a { color: LinkText; }
+details { border-bottom: 1px solid #9994; padding: 12px 0; }
+summary { cursor: pointer; overflow-wrap: anywhere; }
+.record-links { display: flex; flex-wrap: wrap; gap: 14px; margin: 10px 0; }
+pre { padding: 12px; font: 12px ui-monospace, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; background: color-mix(in srgb, CanvasText 4%, transparent); border-radius: 8px; }
+@media (max-width: 700px) { header { position: static; } .controls { flex: 0 0 100%; flex-wrap: wrap; } #search { min-width: 100%; } th { position: static; } }
