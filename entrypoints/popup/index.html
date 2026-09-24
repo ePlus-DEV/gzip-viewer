@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GZIP JSONL Viewer</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main>
+    <h1>GZIP JSONL Viewer</h1>
+    <p>Inspect a feed index, GZIP JSONL shard or single product JSON directly in Chrome.</p>
+    <form id="openForm">
+      <label for="url">Feed URL</label>
+      <input id="url" type="url" placeholder="https://example.com/feeds/products.json" autocomplete="url" required>
+      <button type="submit">Open &amp; validate</button>
+    </form>
+    <button id="lastFeed" type="button" class="secondary">Open last URL</button>
+    <p id="error" role="alert"></p>
+    <small>Remote data stays in your browser; no archive is saved to Downloads.</small>
+  </main>
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>
