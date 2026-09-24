@@ -1,9 +1,9 @@
 {
   "name": "gzip-jsonl-viewer",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "private": true,
   "type": "module",
-  "description": "Chrome extension to inspect JSON, JSONL, GZIP feeds and their product endpoints",
+  "description": "WXT Chrome extension for AEO/SEO audits, LLMS discovery, XML sitemap, product feed and JSONL.GZ cross-tests",
   "scripts": {
     "postinstall": "wxt prepare",
     "dev": "wxt",
