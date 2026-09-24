@@ -69,3 +69,74 @@ describe('GZIP decoder', () => {
     expect(await responseText(new Response(compressed))).toBe('{"sku":"1"}\n');
   });
 });
+
+import {parseLlms, resolveLink} from '../lib/discovery';
+import {documentLabel, readTrail, viewerHref, childTrail} from '../lib/navigation';
+
+describe('llms-first discovery', () => {
+  const lines = [
+    '# Example Catalog',
+    '## Languages',
+    '- English (\x60en\x60)',
+    '- German (\x60de\x60)',
+    '## Product endpoints',
+    '- Single product: \x60https://example.com/{lang}/products/{sku}.json\x60',
+    '## Product Feeds & Catalogs',
+    '- [Full Product Catalog](https://example.com/feeds/products.json)',
+    '- Shards: \x60https://example.com/feeds/products-{lang}-{shard}.jsonl.gz\x60',
+    '## Technical Resources',
+    '- [Pages sitemap](https://example.com/sitemap/pages_index.xml.gz)',
+  ];
+  const sample = lines.join('\n').replace(/\\x60/g, '\x60');
+  const source = 'https://example.com/llms.txt';
+
+  it('extracts grouped resource links, languages and URL templates', () => {
+    const result = parseLlms(sample, source);
+    expect(result.title).toBe('Example Catalog');
+    expect(result.languages).toEqual(['en', 'de']);
+    expect(result.links).toBe(4);
+    expect(result.groups.map(group => group.heading)).toEqual([
+      'Product endpoints', 'Product Feeds & Catalogs', 'Technical Resources',
+    ]);
+    expect(result.groups[0]!.links[0]!.placeholders).toEqual(['lang', 'sku']);
+  });
+
+  it('resolves product endpoints without guessing missing template values', () => {
+    const doc = parseLlms(sample, source);
+    const product = doc.groups[0]!.links[0]!;
+    const shard = doc.groups[1]!.links[1]!;
+    expect(resolveLink(product, source, {lang: 'de', sku: '100470'}))
+      .toBe('https://example.com/de/products/100470.json');
+    expect(resolveLink(shard, source, {lang: 'en'})).toBeNull();
+    expect(resolveLink(shard, source, {lang: 'en', shard: '3'}))
+      .toBe('https://example.com/feeds/products-en-3.jsonl.gz');
+    expect(resolveLink(product, source, {lang: 'de', sku: '../private'})).toBeNull();
+  });
+});
+
+describe('persistent sitemap-style navigation', () => {
+  const viewer = 'chrome-extension://test-extension/viewer.html';
+  const root = {url: 'https://example.com/llms.txt', label: 'llms.txt'};
+  const index = {url: 'https://example.com/feeds/products.json', label: 'Product catalog'};
+  const shard = {url: 'https://example.com/feeds/products-en-1.jsonl.gz', label: 'EN shard 1'};
+  it('keeps the full llms → index → shard → product ancestry across page loads', () => {
+    const ancestors = childTrail(childTrail([root], index), shard);
+    const target = viewerHref(viewer, 'https://example.com/en/products/100470.json', ancestors, 'Product 100470');
+    const params = new URL(target).searchParams;
+    expect(readTrail(params.get('trail'))).toEqual([root, index, shard]);
+    expect(params.get('label')).toBe('Product 100470');
+    const back = viewerHref(viewer, shard.url, [root, index], shard.label);
+    expect(readTrail(new URL(back).searchParams.get('trail'))).toEqual([root, index]);
+    expect(documentLabel(index.url)).toBe('products.json');
+  });
+  it('rejects unsafe and malformed ancestry', () => {
+    expect(readTrail('[{"url":"javascript:alert(1)","label":"Unsafe"}]')).toEqual([]);
+    expect(readTrail('{')).toEqual([]);
+    expect(() => viewerHref(viewer, 'file:///private')).toThrow();
+  });
+  it('recognizes gzip XML sitemaps and llms.txt before generic text', () => {
+    expect(determineFormat(new URL('https://example.com/llms.txt'), '# Example')).toBe('llms');
+    expect(determineFormat(new URL('https://example.com/sitemap/pages_index.xml.gz'), '<sitemapindex/>'))
+      .toBe('sitemap');
+  });
+});

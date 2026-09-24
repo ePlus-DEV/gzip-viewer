@@ -9,12 +9,13 @@
 <body>
   <main>
     <h1>GZIP JSONL Viewer</h1>
-    <p>Inspect a feed index, GZIP JSONL shard or single product JSON directly in Chrome.</p>
+    <p>Start from llms.txt and browse linked feeds, GZIP shards, products and sitemaps with Back and breadcrumbs.</p>
     <form id="openForm">
       <label for="url">Feed URL</label>
-      <input id="url" type="url" placeholder="https://example.com/feeds/products.json" autocomplete="url" required>
-      <button type="submit">Open &amp; validate</button>
+      <input id="url" type="url" placeholder="https://example.com/llms.txt" autocomplete="url" required>
+      <button type="submit">Explore from llms.txt</button>
     </form>
+    <button id="openDirect" type="button" class="secondary">Open exact URL</button>
     <button id="lastFeed" type="button" class="secondary">Open last URL</button>
     <p id="error" role="alert"></p>
     <small>Remote data stays in your browser; no archive is saved to Downloads.</small>

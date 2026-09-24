@@ -1,44 +1,45 @@
 import { browser } from 'wxt/browser';
 import { httpUrl } from '../../lib/feed';
+import { viewerHref } from '../../lib/navigation';
 
 const form = document.querySelector<HTMLFormElement>('#openForm')!;
 const input = document.querySelector<HTMLInputElement>('#url')!;
-const previous = document.querySelector<HTMLButtonElement>('#lastFeed')!;
+const lastButton = document.querySelector<HTMLButtonElement>('#lastFeed')!;
+const directButton = document.querySelector<HTMLButtonElement>('#openDirect')!;
 const errorEl = document.querySelector<HTMLParagraphElement>('#error')!;
 
-async function openViewer(raw: string): Promise<void> {
-  let url: URL;
+async function openViewer(raw: string, llmsFirst: boolean): Promise<void> {
+  let parsed: URL;
   try {
-    url = httpUrl(raw);
+    parsed = httpUrl(raw.trim());
   } catch {
     errorEl.textContent = 'Enter a valid HTTP or HTTPS URL.';
     return;
   }
+  const target = llmsFirst ? new URL('/llms.txt', parsed.origin).href : parsed.href;
   try {
     errorEl.textContent = '';
-    await browser.storage.local.set({lastUrl: url.href});
-    const viewer = browser.runtime.getURL('/viewer.html');
-    await browser.tabs.create({url: viewer + '?url=' + encodeURIComponent(url.href)});
+    await browser.storage.local.set({lastUrl: target});
+    await browser.tabs.create({url: viewerHref(browser.runtime.getURL('/viewer.html'), target, [],
+      llmsFirst ? 'llms.txt' : undefined)});
     window.close();
   } catch (error) {
-    errorEl.textContent = error instanceof Error ? error.message : 'Could not open the viewer.';
+    errorEl.textContent = error instanceof Error ? error.message : 'Could not open viewer.';
   }
 }
 
 void browser.storage.local.get('lastUrl').then(({lastUrl}) => {
   if (typeof lastUrl === 'string' && lastUrl) {
     input.value = lastUrl;
-    previous.disabled = false;
+    lastButton.disabled = false;
   } else {
-    previous.disabled = true;
+    lastButton.disabled = true;
   }
 });
 
 form.addEventListener('submit', event => {
   event.preventDefault();
-  void openViewer(input.value.trim());
+  void openViewer(input.value, true);
 });
-
-previous.addEventListener('click', () => {
-  void openViewer(input.value.trim());
-});
+directButton.addEventListener('click', () => { void openViewer(input.value, false); });
+lastButton.addEventListener('click', () => { void openViewer(input.value, false); });

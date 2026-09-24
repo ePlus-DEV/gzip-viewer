@@ -1,6 +1,6 @@
 # GZIP JSONL Viewer
 
-Chrome extension built with [WXT](https://wxt.dev/) (Manifest V3, vanilla TypeScript). Open remote feed indexes, decompress GZIP shards in Chrome and inspect individual product JSON without saving a download.
+Chrome extension built with [WXT](https://wxt.dev/) (Manifest V3, vanilla TypeScript). Start from llms.txt, follow discovery links like a sitemap, inspect feed indexes, decompress GZIP shards, and open individual product JSON without saving an archive to Downloads.
 
 ## Develop locally
 
@@ -12,11 +12,13 @@ Chrome extension built with [WXT](https://wxt.dev/) (Manifest V3, vanilla TypeSc
 
 ## Inspect a feed
 
-1. Enter an index URL, for example `https://example.com/feeds/products.json`, in the popup.
-2. Check declared product/shard counts, languages, duplicate URLs and malformed shard metadata.
-3. Choose **View decoded** to fetch a `.jsonl.gz` shard and expand parsed JSONL records.
-4. For recognized shard paths, **Open single product JSON** constructs `/{lang}/products/{sku}.json` on the source origin.
-5. Other JSON documents and `.txt` files can be opened in the same viewer.
+1. Enter any URL on the target site (or its llms.txt URL) and choose **Explore from llms.txt**. The extension opens that site's `/llms.txt` by default. Choose **Open exact URL** for an advanced direct entry.
+2. Browse links grouped by llms.txt headings. Links to feed indexes, XML sitemaps, and other documents open **in the same viewer tab**. URL templates provide fields for `{lang}`, `{sku}`, and `{shard}`; look up published shard numbers from the feed index instead of guessing.
+3. Open the feed index and check declared product/shard counts, languages, duplicate URLs and malformed metadata.
+4. Select **View decoded** to fetch a `.jsonl.gz` shard and expand parsed records.
+5. For recognized shard paths, **Open single product JSON** constructs `/{lang}/products/{sku}.json` on the source origin.
+6. Use the persistent **Back**, **Home**, resource tree, or clickable breadcrumbs to return to any previous document in the discovery chain. Browser Back also works.
+7. Links to `.xml` and `.xml.gz` sitemap indexes or URL sitemaps are browsable; ordinary web-page links open as websites instead of being treated as JSON.
 
 No private or staging URL is hard-coded in the source. GZIP responses are decoded in browser memory; if the browser has already handled Content-Encoding, plain text is read directly.
 
@@ -26,6 +28,9 @@ No private or staging URL is hard-coded in the source. GZIP responses are decode
 - `entrypoints/popup/`: extension URL form.
 - `entrypoints/viewer/`: standalone unlisted WXT viewer page, built as `/viewer.html`.
 - `lib/feed.ts`: feed-index metadata validation, product warnings, JSONL parsing and URL derivation.
+- `lib/discovery.ts`: parse llms.txt links and resolve URL templates.
+- `lib/navigation.ts`: durable URL-based breadcrumbs and Back/Home navigation.
+- `lib/sitemap.ts`: XML sitemap index and URL set parsing.
 - `lib/decompress.ts`: raw GZIP detection/decompression.
 - `tests/`: Vitest tests covering JSONL, indexing, link derivation, and GZIP.
 - `.github/workflows/ci.yml`: typecheck, test and build on pull requests and branch updates.

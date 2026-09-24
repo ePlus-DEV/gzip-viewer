@@ -5,8 +5,11 @@ import {
   type FeedIndexAudit, type Issue, type JsonlRow,
 } from '../../lib/feed';
 import { responseText } from '../../lib/decompress';
+import { parseLlms, resolveLink, type LlmsDocument, type ResourceLink } from '../../lib/discovery';
+import { parseSitemap, type ParsedSitemap } from '../../lib/sitemap';
+import { childTrail, documentLabel, readTrail, viewerHref as routedHref, type NavItem } from '../../lib/navigation';
 
-type Mode = 'feed-index' | 'jsonl' | 'json' | 'text';
+type Mode = ReturnType<typeof determineFormat>;
 
 interface ViewerState {
   mode: Mode | null;
@@ -15,6 +18,8 @@ interface ViewerState {
   index: FeedIndexAudit | null;
   json: unknown;
   text: string;
+  llms: LlmsDocument | null;
+  sitemap: ParsedSitemap | null;
 }
 
 const searchEl = document.querySelector<HTMLInputElement>('#search')!;
@@ -26,8 +31,21 @@ const statusEl = document.querySelector<HTMLDivElement>('#status')!;
 const metricsEl = document.querySelector<HTMLElement>('#summary')!;
 const itemsEl = document.querySelector<HTMLElement>('#items')!;
 
-const rawUrl = new URLSearchParams(location.search).get('url');
-let state: ViewerState = {mode: null, rows: [], invalid: 0, index: null, json: null, text: ''};
+const currentParams = new URLSearchParams(location.search);
+const rawUrl = currentParams.get('url');
+const trail = readTrail(currentParams.get('trail'));
+const currentItem: NavItem = {
+  url: rawUrl || '',
+  label: currentParams.get('label')?.slice(0, 120) || (rawUrl ? documentLabel(rawUrl) : 'Document'),
+};
+const backEl = document.querySelector<HTMLButtonElement>('#back')!;
+const homeEl = document.querySelector<HTMLButtonElement>('#home')!;
+const breadcrumbsEl = document.querySelector<HTMLDivElement>('#breadcrumbs')!;
+const treeEl = document.querySelector<HTMLDivElement>('#tree')!;
+let state: ViewerState = {
+  mode: null, rows: [], invalid: 0, index: null, json: null, text: '',
+  llms: null, sitemap: null,
+};
 
 function setStatus(message: string, level: 'ok' | 'warn' | 'error' | '' = ''): void {
   statusEl.textContent = message;
@@ -58,11 +76,68 @@ function showIssues(issues: Issue[]): HTMLElement {
   return wrapper;
 }
 
-function viewerLink(url: string): string {
-  return browser.runtime.getURL('/viewer.html') + '?url=' + encodeURIComponent(url);
+function viewerLink(url: string, label?: string): string {
+  return routedHref(
+    browser.runtime.getURL('/viewer.html'), url, childTrail(trail, currentItem),
+    label || documentLabel(url),
+  );
 }
 
-function externalAnchor(label: string, raw: unknown, viewer = false): HTMLAnchorElement | null {
+function ancestorHref(item: NavItem, index: number): string {
+  return routedHref(browser.runtime.getURL('/viewer.html'), item.url, trail.slice(0, index), item.label);
+}
+
+function renderNavigation(): void {
+  const chain = [...trail, currentItem];
+  breadcrumbsEl.replaceChildren();
+  chain.forEach((item, index) => {
+    if (index) breadcrumbsEl.append(node('span', '›', 'separator'));
+    if (index === chain.length - 1) {
+      breadcrumbsEl.append(node('span', item.label, 'current'));
+    } else {
+      const a = node('a', item.label);
+      a.href = ancestorHref(item, index);
+      breadcrumbsEl.append(a);
+    }
+  });
+
+  backEl.disabled = trail.length === 0;
+  homeEl.disabled = trail.length === 0;
+  backEl.onclick = () => {
+    if (trail.length) location.assign(ancestorHref(trail[trail.length - 1]!, trail.length - 1));
+  };
+  homeEl.onclick = () => {
+    if (trail.length) location.assign(ancestorHref(trail[0]!, 0));
+  };
+}
+
+function renderTree(): void {
+  treeEl.replaceChildren();
+  trail.forEach((item, i) => {
+    const a = node('a', (i === 0 ? '⌂ ' : '↳ ') + item.label);
+    a.href = ancestorHref(item, i);
+    treeEl.append(a);
+  });
+  treeEl.append(node('span', '● ' + currentItem.label, 'tree-active'));
+  if (state.mode === 'llms' && state.llms) {
+    state.llms.groups.forEach((group, i) => {
+      const a = node('a', group.heading + ' (' + group.links.length + ')', 'tree-section');
+      a.href = '#resource-' + i;
+      treeEl.append(a);
+    });
+  }
+}
+
+function isBrowsable(url: string): boolean {
+  try {
+    const pathname = httpUrl(url).pathname;
+    return /\.(?:json|jsonl|ndjson|gz|txt|xml|md)$/i.test(pathname);
+  } catch {
+    return false;
+  }
+}
+
+function externalAnchor(label: string, raw: unknown, viewer = false, breadcrumbLabel?: string): HTMLAnchorElement | null {
   if (typeof raw !== 'string') return null;
   let url: URL;
   try {
@@ -71,7 +146,7 @@ function externalAnchor(label: string, raw: unknown, viewer = false): HTMLAnchor
     return null;
   }
   const link = node('a', label);
-  link.href = viewer ? viewerLink(url.href) : url.href;
+  link.href = viewer ? viewerLink(url.href, breadcrumbLabel) : url.href;
   if (!viewer) {
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
@@ -116,7 +191,7 @@ function renderIndex(): void {
     else source.textContent = shard.url;
     const modified = node('td', shard.lastModified || '—');
     const action = node('td');
-    const view = externalAnchor('View decoded', shard.url, true);
+    const view = externalAnchor('View decoded', shard.url, true, shard.language.toUpperCase() + ' · ' + documentLabel(shard.url));
     if (view) action.append(view);
     tr.append(language, source, modified, action);
     tbody.append(tr);
@@ -148,7 +223,7 @@ function recordLinks(record: Record<string, unknown>): HTMLElement {
 
   if (rawUrl) {
     const single = productJsonUrl(rawUrl, record.sku);
-    const details = single && externalAnchor('Open single product JSON', single, true);
+    const details = single && externalAnchor('Open single product JSON', single, true, 'Product ' + String(record.sku));
     if (details) wrapper.append(details);
   }
   return wrapper;
@@ -213,6 +288,165 @@ function renderJson(): void {
   setStatus('Valid JSON' + (issues.length ? ' · ' + issues.length + ' metadata warning(s)' : ''), issues.length ? 'warn' : 'ok');
 }
 
+function renderLlms(): void {
+  const llms = state.llms!;
+  const term = searchEl.value.trim().toLowerCase();
+  let count = 0;
+  metricsEl.replaceChildren(
+    metric('Source', 'llms.txt'),
+    metric('Links', llms.links),
+    metric('Sections', llms.groups.length),
+    metric('Languages', llms.languages.join(', ') || '—'),
+  );
+
+  const container = node('div');
+  for (const [sectionIndex, group] of llms.groups.entries()) {
+    const links = term
+      ? group.links.filter(link => (link.label + ' ' + link.url).toLowerCase().includes(term))
+      : group.links;
+    if (!links.length) continue;
+
+    const section = node('section', undefined, 'resource-group');
+    section.id = 'resource-' + sectionIndex;
+    section.append(node('h2', group.heading + ' (' + links.length + ')'));
+
+    for (const link of links) {
+      count++;
+      const row = node('div', undefined, 'resource-row');
+      const title = node('div', undefined, 'resource-title');
+      const resolved = resolveLink(link, rawUrl!);
+
+      if (resolved && link.placeholders.length === 0) {
+        const anchor = externalAnchor(
+          link.label, resolved, isBrowsable(resolved), link.label,
+        );
+        if (anchor) title.append(anchor);
+      } else {
+        title.append(node('strong', link.label));
+      }
+
+      if (link.placeholders.length) title.append(node('span', 'URL template', 'issue'));
+      row.append(title, node('span', link.url, 'resource-url'));
+
+      if (link.placeholders.length) {
+        const form = node('form', undefined, 'resource-form');
+        const fields = new Map<string, HTMLInputElement | HTMLSelectElement>();
+        for (const placeholder of link.placeholders) {
+          const wrapper = node('label', placeholder.toUpperCase());
+          let field: HTMLInputElement | HTMLSelectElement;
+          if (placeholder === 'lang' && llms.languages.length) {
+            const select = node('select');
+            for (const language of llms.languages) {
+              const option = node('option', language);
+              option.value = language;
+              select.append(option);
+            }
+            field = select;
+          } else {
+            const input = node('input');
+            input.type = 'text';
+            input.required = true;
+            input.maxLength = 180;
+            input.placeholder = placeholder === 'sku' ? 'Product SKU'
+              : placeholder === 'shard' ? 'Number from feed index' : placeholder;
+            if (placeholder === 'lang') input.value = 'en';
+            field = input;
+          }
+          field.name = placeholder;
+          fields.set(placeholder, field);
+          wrapper.append(field);
+          form.append(wrapper);
+        }
+        const submit = node('button', 'Resolve & view');
+        submit.type = 'submit';
+        form.append(submit);
+        const warning = node('small', '', 'error');
+        form.append(warning);
+        form.addEventListener('submit', event => {
+          event.preventDefault();
+          const values: Record<string, string> = {};
+          fields.forEach((field, key) => { values[key] = field.value; });
+          const destination = resolveLink(link, rawUrl!, values);
+          if (!destination) {
+            warning.textContent = 'Fill in every template variable with a valid value.';
+            return;
+          }
+          location.assign(viewerLink(destination, link.label));
+        });
+        row.append(form);
+        if (link.placeholders.includes('shard')) {
+          row.append(node('small', 'Find actual shard numbers in the product feed index; do not guess.'));
+        }
+      }
+      section.append(row);
+    }
+    container.append(section);
+  }
+
+  const source = node('details', undefined, 'source-text');
+  source.append(node('summary', 'View original llms.txt source'), node('pre', state.text));
+  container.append(source);
+  itemsEl.replaceChildren(container);
+  setStatus(
+    count + ' link(s) shown / ' + llms.links + ' discovered. Select a resource to browse its children.',
+    llms.links ? 'ok' : 'warn',
+  );
+}
+
+function renderSitemap(): void {
+  const sitemap = state.sitemap!;
+  const term = searchEl.value.trim().toLowerCase();
+  const matching = term
+    ? sitemap.entries.filter(entry =>
+        (entry.url + ' ' + (entry.lastModified || '')).toLowerCase().includes(term))
+    : sitemap.entries;
+  const max = Number(limitEl.value);
+  const visible = max ? matching.slice(0, max) : matching;
+
+  metricsEl.replaceChildren(
+    metric('Type', sitemap.title),
+    metric('Entries', sitemap.entries.length.toLocaleString()),
+    metric('Validation issues', sitemap.issues.length),
+  );
+  const container = node('div');
+  if (sitemap.issues.length) {
+    container.append(showIssues(sitemap.issues.map(message => ({severity: 'warning', message}))));
+  }
+  const table = node('table');
+  const header = node('tr');
+  for (const label of ['Type', 'URL', 'Last modified', 'Action']) header.append(node('th', label));
+  const head = node('thead'); head.append(header);
+  const body = node('tbody');
+  for (const entry of visible) {
+    const tr = node('tr');
+    const source = node('td');
+    const rawLink = externalAnchor(entry.url, entry.url);
+    if (rawLink) source.append(rawLink);
+    else source.textContent = entry.url;
+    const action = node('td');
+    const next = externalAnchor(
+      isBrowsable(entry.url) ? 'Explore' : 'Open page',
+      entry.url, isBrowsable(entry.url), documentLabel(entry.url),
+    );
+    if (next) action.append(next);
+    tr.append(
+      node('td', entry.kind),
+      source,
+      node('td', entry.lastModified || '—'),
+      action,
+    );
+    body.append(tr);
+  }
+  table.append(head, body);
+  container.append(table);
+  itemsEl.replaceChildren(container);
+  setStatus(
+    visible.length.toLocaleString() + ' shown / ' + matching.length.toLocaleString()
+      + ' matched / ' + sitemap.entries.length.toLocaleString() + ' entries',
+    sitemap.issues.length ? 'warn' : 'ok',
+  );
+}
+
 function renderText(): void {
   metricsEl.replaceChildren(metric('Format', 'Text'));
   itemsEl.replaceChildren(node('pre', state.text));
@@ -221,6 +455,9 @@ function renderText(): void {
 
 function render(): void {
   modeEl.textContent = state.mode ? state.mode.toUpperCase() : '';
+  renderTree();
+  if (state.mode === 'llms') return renderLlms();
+  if (state.mode === 'sitemap') return renderSitemap();
   if (state.mode === 'feed-index') return renderIndex();
   if (state.mode === 'jsonl') return renderRows();
   if (state.mode === 'json') return renderJson();
@@ -244,7 +481,7 @@ async function load(): Promise<void> {
   sourceEl.textContent = 'Source: ' + url.origin + url.pathname;
   itemsEl.replaceChildren();
   metricsEl.replaceChildren();
-  state = {mode: null, rows: [], invalid: 0, index: null, json: null, text: ''};
+  state = {mode: null, rows: [], invalid: 0, index: null, json: null, text: '', llms: null, sitemap: null};
   setStatus('Fetching…');
   reloadEl.disabled = true;
 
@@ -256,7 +493,12 @@ async function load(): Promise<void> {
     state.mode = determineFormat(url, text, response.headers.get('content-type') ?? '');
 
     setStatus('Parsing and validating…');
-    if (state.mode === 'feed-index') {
+    if (state.mode === 'llms') {
+      state.text = text;
+      state.llms = parseLlms(text, url.href);
+    } else if (state.mode === 'sitemap') {
+      state.sitemap = parseSitemap(text, url.href);
+    } else if (state.mode === 'feed-index') {
       state.index = auditFeedIndex(JSON.parse(text) as unknown, url.href);
     } else if (state.mode === 'jsonl') {
       const parsed = parseJsonLines(text);
@@ -280,6 +522,8 @@ async function load(): Promise<void> {
   }
 }
 
+renderNavigation();
+renderTree();
 searchEl.addEventListener('input', render);
 limitEl.addEventListener('change', render);
 reloadEl.addEventListener('click', () => { void load(); });

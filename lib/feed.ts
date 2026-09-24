@@ -44,7 +44,9 @@ export function determineFormat(
   url: URL,
   text: string,
   contentType = '',
-): 'feed-index' | 'jsonl' | 'json' | 'text' {
+): 'feed-index' | 'jsonl' | 'json' | 'text' | 'llms' | 'sitemap' {
+  if (/(?:^|\/)llms(?:-full)?\.txt$/i.test(url.pathname)) return 'llms';
+  if (/\.xml(?:\.gz)?$/i.test(url.pathname)) return 'sitemap';
   if (/\.((?:jsonl)|(?:ndjson))(?:\.gz)?$/i.test(url.pathname)) return 'jsonl';
   if (/\.json(?:\.gz)?$/i.test(url.pathname) || /(?:application|text)\/(?:[a-z0-9.+-]*\+)?json/i.test(contentType)) {
     try {
