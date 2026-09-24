@@ -2,12 +2,17 @@
   "extends": "./.wxt/tsconfig.json",
   "compilerOptions": {
     "strict": true,
-    "noEmit": true
+    "noEmit": true,
+    "jsx": "react-jsx"
   },
   "include": [
     "entrypoints/**/*.ts",
+    "entrypoints/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
     "lib/**/*.ts",
     "tests/**/*.ts",
+    "tests/**/*.tsx",
     "wxt.config.ts",
     "vitest.config.ts",
     ".wxt/wxt.d.ts"

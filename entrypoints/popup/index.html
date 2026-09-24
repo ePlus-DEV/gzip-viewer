@@ -1,26 +1,5 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SEO & AEO Auditor</title>
-  <link rel="stylesheet" href="./style.css">
-</head>
-<body>
-  <main>
-    <h1>GZIP JSONL Viewer</h1>
-    <p>Choose AEO or SEO in Run Tests, or explore llms.txt, XML sitemaps, GZIP feeds and products manually.</p>
-    <form id="openForm">
-      <label for="url">Feed URL</label>
-      <input id="url" type="url" placeholder="https://example.com/llms.txt" autocomplete="url" required>
-      <button type="submit">Explore from llms.txt</button>
-    </form>
-    <button id="runTests" type="button">▶ Run Tests</button>
-    <button id="openDirect" type="button" class="secondary">Open exact URL</button>
-    <button id="lastFeed" type="button" class="secondary">Open last URL</button>
-    <p id="error" role="alert"></p>
-    <small>Remote data stays in your browser; no archive is saved to Downloads.</small>
-  </main>
-  <script type="module" src="./main.ts"></script>
-</body>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SEO &amp; AEO Auditor</title></head>
+<body><div id="app"></div><script type="module" src="./main.tsx"></script></body>
 </html>

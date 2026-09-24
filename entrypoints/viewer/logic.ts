@@ -22,6 +22,7 @@ interface ViewerState {
   sitemap: ParsedSitemap | null;
 }
 
+export function initializeViewer(): void {
 const searchEl = document.querySelector<HTMLInputElement>('#search')!;
 const limitEl = document.querySelector<HTMLSelectElement>('#limit')!;
 const reloadEl = document.querySelector<HTMLButtonElement>('#reload')!;
@@ -534,3 +535,5 @@ document.querySelector<HTMLButtonElement>('#runTests')!.addEventListener('click'
   const url = new URL('/llms.txt', httpUrl(rawUrl).origin);
   location.assign(browser.runtime.getURL('/test-runner.html') + '?url=' + encodeURIComponent(url.href));
 });
+
+}

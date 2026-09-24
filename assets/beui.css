@@ -1,0 +1,58 @@
+@import "tailwindcss";
+@source "../components/beui/**/*.{ts,tsx}";
+@source "../entrypoints/**/*.{ts,tsx}";
+
+@theme inline {
+  --color-primary: var(--ui-accent);
+  --color-primary-foreground: #ffffff;
+  --color-foreground: var(--ui-text);
+  --color-muted-foreground: var(--ui-subtle);
+  --color-muted: var(--ui-muted);
+  --color-card: var(--ui-panel);
+  --color-border: var(--ui-border);
+  --color-destructive: #df4d59;
+  --color-ring: var(--ui-accent);
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+}
+
+:root {
+  color-scheme: light;
+  --ui-page: #f4f7fb;
+  --ui-panel: #ffffff;
+  --ui-text: #17253f;
+  --ui-subtle: #63718a;
+  --ui-border: #dfe7f0;
+  --ui-muted: #f1f5f9;
+  --ui-accent: #2864ea;
+  --ui-accent-soft: #eaf0ff;
+  --ui-success: #118364;
+  --ui-error: #d44a57;
+  --ui-warning: #a97714;
+  --ui-shadow: 0 12px 34px rgb(24 51 86 / 6%);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --ui-page: #0b1322;
+    --ui-panel: #121d30;
+    --ui-text: #f0f5fd;
+    --ui-subtle: #9cacbf;
+    --ui-border: #293852;
+    --ui-muted: #1a2941;
+    --ui-accent: #6e9bff;
+    --ui-accent-soft: #1a3456;
+    --ui-success: #5ac5a1;
+    --ui-error: #fe8d9b;
+    --ui-warning: #e8bd65;
+    --ui-shadow: 0 12px 34px rgb(0 0 0 / 18%);
+  }
+}
+@layer base {
+  * { box-sizing: border-box; }
+  body { color: var(--ui-text); background: var(--ui-page); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+  button:not(:disabled), a, summary, input[type="radio"] { cursor: pointer; }
+  button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--ui-accent) 45%, transparent);
+    outline-offset: 3px;
+  }
+}
