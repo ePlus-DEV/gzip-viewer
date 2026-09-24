@@ -104,7 +104,8 @@ export function isSitemapUrl(input: string): boolean {
 
 export function isProductPage(input: string): boolean {
   try {
-    return /\/(?:product|products)\/[^/]+\/?$/i.test(new URL(input).pathname);
+    const path = new URL(input).pathname;
+    return !/\.(?:json|jsonl|gz|xml)$/i.test(path) && /\/(?:product|products)\/[^/]+\/?$/i.test(path);
   } catch { return false; }
 }
 
