@@ -26,7 +26,7 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function childText(el: Element, tag: string): string | null {
+function childText(el: ParentNode, tag: string): string | null {
   return el.querySelector(tag)?.getAttribute('content')?.trim() || null;
 }
 
