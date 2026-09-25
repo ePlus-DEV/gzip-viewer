@@ -7,6 +7,8 @@ import {chromium} from 'playwright';
 
 const extension = resolve('.output/chrome-mv3');
 const sites = {origin: ''};
+const requestCounts = new Map();
+function hits(pathname) { return requestCounts.get(pathname) ?? 0; }
 const changed = new Date().toISOString();
 const product = {
   id: 101, sku: '101', mpn: 'ABC', gtin: '1234567890128',
@@ -56,6 +58,7 @@ const body = (pathname) => {
 };
 const server = createServer((request,response)=>{
   const pathname = new URL(request.url||'/',sites.origin||'http://localhost').pathname;
+  requestCounts.set(pathname, hits(pathname)+1);
   const [type,content]=body(pathname);
   response.writeHead(content==='Missing fixture'?404:200,{'content-type':type});
   response.end(content);
@@ -105,33 +108,59 @@ try {
     'Popup must preserve the requested test scope.');
   console.log('Popup smoke PASS: Run AEO Tests opens the real audit runner.');
   await page.screenshot({path:'artifacts/audit-dashboard.png',fullPage:true});
-  assert.equal(await page.locator('#run').isEnabled(),true,'Run Tests should start enabled.');
-  await page.locator('#run').click();
+  // A single popup click must START AND FINISH the audit, with no second click.
+  // A run request must be consumed so refresh does not trigger more HTTP scans.
   await page.waitForFunction(()=>
     document.querySelector('#activity')?.textContent?.includes('Finished.'),
     undefined,{timeout:90000},
   );
   assert.equal(await page.locator('#run').isEnabled(),true,'AEO Run should re-enable on completion.');
+  assert.equal(new URL(page.url()).searchParams.has('autorun'),false,
+    'The one-shot launch flag must be consumed before the audit begins.');
+  assert.equal(hits('/llms.txt'),1,'One popup click must start exactly one AEO scan.');
   const pass=Number(await page.locator('#passed').innerText());
   assert.ok(pass>=3,'AEO must execute real HTTP/data checks, not just display the UI.');
   assert.match(await page.locator('#elapsed').innerText(),/^\d\d:\d\d:\d\d$/,'Timing must show elapsed duration.');
   console.log('AEO smoke PASS: '+pass+' live checks.');
   await page.screenshot({path:'artifacts/aeo-results.png',fullPage:true});
 
-  await page.locator('input[name="audit-mode"][value="seo"]').check({force:true});
-  await page.locator('#scope').selectOption('quick');
+  await page.reload({waitUntil:'networkidle'});
+  assert.match(await page.locator('#activity').innerText(),/Ready\. Choose a mode/,
+    'Refreshing a completed audit must return to idle, not repeat a scan.');
+  assert.equal(hits('/llms.txt'),1,'Refreshing the results tab must NOT rerun AEO.');
+  // The same runner must still allow the user to explicitly start again.
   await page.locator('#run').click();
   await page.waitForFunction(()=>
     document.querySelector('#activity')?.textContent?.includes('Finished.'),
     undefined,{timeout:90000},
   );
-  assert.equal(await page.locator('#run').isEnabled(),true,'SEO Run should re-enable on completion.');
-  const seoPass=Number(await page.locator('#passed').innerText());
+  assert.equal(hits('/llms.txt'),2,'The manually triggered rerun must execute once.');
+  console.log('Manual rerun smoke PASS: no refresh loop and Run remains functional.');
+
+  // Select SEO in a fresh popup: the new SEO tab must start without another click.
+  const seoPopup=await context.newPage();
+  await seoPopup.goto('chrome-extension://'+id+'/popup.html',{waitUntil:'networkidle'});
+  await seoPopup.locator('#site').fill(sites.origin+'/en/product/test-item');
+  await seoPopup.getByRole('radio',{name:/SEO Audit/i}).click();
+  const seoTabPromise=context.waitForEvent('page',{timeout:25000});
+  await seoPopup.getByRole('button',{name:/Run SEO Tests/i}).click();
+  const seoPage=await seoTabPromise;
+  await seoPage.waitForURL(url => url.protocol === 'chrome-extension:' && url.pathname === '/test-runner.html', {timeout:20000});
+  seoPage.on('pageerror',error=>exceptions.push('SEO: '+(error.stack||error.message)));
+  assert.equal(new URL(seoPage.url()).searchParams.get('mode'),'seo');
+  await seoPage.waitForFunction(()=>
+    document.querySelector('#activity')?.textContent?.includes('Finished.'),
+    undefined,{timeout:90000},
+  );
+  assert.equal(await seoPage.locator('#run').isEnabled(),true,'SEO Run must re-enable on completion.');
+  assert.equal(new URL(seoPage.url()).searchParams.has('autorun'),false);
+  assert.equal(hits('/robots.txt'),1,'One popup click must start exactly one SEO scan.');
+  const seoPass=Number(await seoPage.locator('#passed').innerText());
   assert.ok(seoPass>=3,'SEO must crawl a real XML sitemap and page.');
-  console.log('SEO smoke PASS: '+seoPass+' live checks.');
-  await page.screenshot({path:'artifacts/seo-results.png',fullPage:true});
+  console.log('SEO autorun smoke PASS: '+seoPass+' live checks.');
+  await seoPage.screenshot({path:'artifacts/seo-results.png',fullPage:true});
   assert.deepEqual(exceptions,[],'Extension raised unexpected runtime or browser console errors.');
-  console.log('Extension smoke passed: popup navigation and both mode buttons dispatch actual tests.');
+  console.log('Extension smoke passed: one-click AEO/SEO autorun, one-shot refresh protection, and manual rerun.');
 } finally {
   await context?.close();
   await new Promise(resolvePromise=>server.close(resolvePromise));

@@ -7,6 +7,7 @@ import {AUDIT_MODES, type AuditMode} from '../../lib/audit-modes';
 import {runSeoAudit} from './seo';
 import {createFindingList} from './findings';
 import {isAuditComplete} from '../../lib/audit-results';
+import {pendingAutoRun} from '../../lib/audit-launch';
 import {
   buildCompletionNotification, COMPLETION_NOTIFICATION_KEY, COMPLETION_NOTIFICATION_PREFIX,
 } from '../../lib/audit-notifications';
@@ -810,17 +811,31 @@ exportEl.addEventListener('click', () => {
   anchor.click();
   setTimeout(() => URL.revokeObjectURL(href), 10000);
 });
-void browser.storage.local.get('lastUrl').then(({lastUrl}) => {
-  const provided = new URLSearchParams(location.search).get('url');
-  // The React input is populated from URL query or stored preference.
-  const initialScope = new URLSearchParams(location.search).get('scope');
-  if (initialScope === 'full' || initialScope === 'quick') scopeEl.value = initialScope;
-  const initialMode = new URLSearchParams(location.search).get('mode');
-  if (initialMode === 'seo') {
-    const seo = modeInputs.find(input => input.value === 'seo');
-    if (seo) seo.checked = true;
-  }
-  renderMode();
-}).catch(()=>renderMode());
+// The popup's Run command is a one-time launch. Manual navigation into the
+// dashboard and page refreshes must NOT silently restart potentially huge scans.
+// The React input already owns and initializes the site URL from the query.
+const params = new URLSearchParams(location.search);
+const scopeFromPopup = params.get('scope');
+if (scopeFromPopup === 'quick' || scopeFromPopup === 'full') {
+  scopeEl.value = scopeFromPopup;
+}
+if (params.get('mode') === 'seo') {
+  const seo = modeInputs.find(input => input.value === 'seo');
+  if (seo) seo.checked = true;
+}
+renderMode();
+
+const autoRun = pendingAutoRun(location.href);
+if (autoRun) {
+  // Consume before starting so F5, reopening a bookmark, or returning to this
+  // tab never duplicates an audit. The user can use Run again manually.
+  window.history.replaceState(window.history.state, '', autoRun.cleanHref);
+  queueMicrotask(() => { if (!controller) runEl.click(); });
+} else if (params.get('autorun') === '1') {
+  const clean = new URL(location.href);
+  clean.searchParams.delete('autorun');
+  window.history.replaceState(window.history.state, '', clean.href);
+  activityEl.textContent = 'Cannot start automatically: enter a valid HTTP(S) site URL.';
+}
 
 }

@@ -98,7 +98,7 @@ function App() {
           <div className="sidebar-info"><ShieldCheck size={17}/>
             <span>Site data is fetched using your current Chrome session. No external uploads.</span>
           </div>
-          <div className="sidebar-credit">SEO &amp; AEO Auditor <span>v1.9</span></div>
+          <div className="sidebar-credit">SEO &amp; AEO Auditor <span>v1.9.1</span></div>
         </aside>
 
         <main className="audit-content">
