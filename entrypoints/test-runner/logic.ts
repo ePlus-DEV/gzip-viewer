@@ -830,7 +830,10 @@ if (autoRun) {
   // Consume before starting so F5, reopening a bookmark, or returning to this
   // tab never duplicates an audit. The user can use Run again manually.
   window.history.replaceState(window.history.state, '', autoRun.cleanHref);
-  queueMicrotask(() => { if (!controller) runEl.click(); });
+  // Invoke the engine itself; synthetic button clicks can be missed while
+  // React/Motion commits the new page's initial UI.
+  activityEl.textContent = 'Starting the selected audit…';
+  if (!controller) void (chosenMode() === 'seo' ? runSeo() : runAeo());
 } else if (params.get('autorun') === '1') {
   const clean = new URL(location.href);
   clean.searchParams.delete('autorun');
