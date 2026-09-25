@@ -28,7 +28,7 @@ jobs:
       - name: Browser smoke — real AEO and SEO Run Tests
         run: npm run test:smoke
       - uses: actions/upload-artifact@v4
-        if: success()
+        if: always()
         with:
           name: audit-dashboard-preview
           path: artifacts/*.png

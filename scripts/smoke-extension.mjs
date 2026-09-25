@@ -110,10 +110,23 @@ try {
   await page.screenshot({path:'artifacts/audit-dashboard.png',fullPage:true});
   // A single popup click must START AND FINISH the audit, with no second click.
   // A run request must be consumed so refresh does not trigger more HTTP scans.
-  await page.waitForFunction(()=>
-    document.querySelector('#activity')?.textContent?.includes('Finished.'),
-    undefined,{timeout:90000},
-  );
+  try {
+    await page.waitForFunction(()=>
+      document.querySelector('#activity')?.textContent?.includes('Finished.'),
+      undefined,{timeout:16000},
+    );
+  } catch (error) {
+    console.log('Audit diagnostic', JSON.stringify({
+      url:page.url(),
+      site:await page.locator('#site').inputValue(),
+      activity:await page.locator('#activity').innerText(),
+      runEnabled:await page.locator('#run').isEnabled(),
+      counts:{llms:hits('/llms.txt'),robots:hits('/robots.txt')},
+      pageErrors:exceptions,
+    }));
+    await page.screenshot({path:'artifacts/autorun-debug.png',fullPage:true});
+    throw error;
+  }
   assert.equal(await page.locator('#run').isEnabled(),true,'AEO Run should re-enable on completion.');
   assert.equal(new URL(page.url()).searchParams.has('autorun'),false,
     'The one-shot launch flag must be consumed before the audit begins.');
