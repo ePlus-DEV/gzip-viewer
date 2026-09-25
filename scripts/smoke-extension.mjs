@@ -124,7 +124,6 @@ try {
       runEnabled:await page.locator('#run').isEnabled(),
       counts:{llms:hits('/llms.txt'),robots:hits('/robots.txt')},
       pageErrors:exceptions,
-      launchTrace:await page.evaluate(()=>sessionStorage.getItem('audit-launch-trace')),
       startupError:await page.locator('.startup-error').allInnerTexts(),
       timing:await page.locator('#elapsed').innerText(),
     }));

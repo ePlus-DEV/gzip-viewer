@@ -34,14 +34,6 @@ interface Report {
   completed: boolean;
 }
 export function initializeAuditRunner(): void {
-function traceLaunch(stage: string): void {
-  try {
-    const key='audit-launch-trace';
-    const previous=JSON.parse(sessionStorage.getItem(key)||'[]') as string[];
-    sessionStorage.setItem(key,JSON.stringify([...previous.slice(-24),stage]));
-  } catch { /* Diagnostic breadcrumbs must not affect the audit. */ }
-}
-traceLaunch('initialize');
 const required=['site','scope','reference','links','run','stop','export','browse','activity','progress',
   'findings','summary','notification-status','elapsed','remaining','finish-at','duration-label',
   'remaining-label','finish-label','timing-note','result-filter','result-query','results-visible'];
@@ -453,12 +445,10 @@ function renderMode(): void {
 }
 
 async function runAeo(): Promise<void> {
-  traceLaunch('aeo-enter');
   if (controller) return;
   let entered: URL;
   try { entered = httpUrl(siteEl.value.trim()); }
   catch { activityEl.textContent = 'Enter a valid HTTP(S) site URL.'; return; }
-  traceLaunch('aeo-url-valid');
   const llms = new URL('/llms.txt', entered.origin);
   const scope = scopeEl.value as Scope;
   const linkLimit = Number(linksEl.value);
@@ -472,7 +462,6 @@ async function runAeo(): Promise<void> {
   findingList.schedule([]);
   progressEl.value = 0;
   startClock();
-  traceLaunch('aeo-clock-started');
   notificationStatusEl.textContent = '';
   runEl.disabled = true;
   emitRunState();
@@ -484,7 +473,6 @@ async function runAeo(): Promise<void> {
 
   try {
     step('1/5 · Discovering resources from llms.txt…', 3);
-    traceLaunch('aeo-first-step');
     const llmsResponse = await fetchResponse(llms.href);
     if (!llmsResponse.ok || !checkRedirect(llmsResponse, entered, 'PCL-LLMS-DOMAIN')) {
       finding('PCL-LLMS', 'fail', 'llms.txt unavailable: HTTP ' + llmsResponse.status,
@@ -842,11 +830,9 @@ if (autoRun) {
   // Consume before starting so F5, reopening a bookmark, or returning to this
   // tab never duplicates an audit. The user can use Run again manually.
   window.history.replaceState(window.history.state, '', autoRun.cleanHref);
-  traceLaunch('autorun-consumed');
   // Invoke the engine itself; synthetic button clicks can be missed while
   // React/Motion commits the new page's initial UI.
   activityEl.textContent = 'Starting the selected audit…';
-  traceLaunch('autorun-dispatch');
   if (!controller) void (chosenMode() === 'seo' ? runSeo() : runAeo());
 } else if (params.get('autorun') === '1') {
   const clean = new URL(location.href);
