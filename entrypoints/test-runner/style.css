@@ -23,3 +23,6 @@ progress{width:100%;height:12px;accent-color:#236bd7}#activity{margin:8px 0 18px
 .status.pass{background:#15803d22;color:#22a558}.status.fail{background:#bd353522;color:#e05a5a}
 .status.warning{background:#e3ac2626;color:#c18b28}.status.blocked,.status.not-run{background:#9993}
 @media(max-width:750px){.settings{grid-template-columns:1fr}.totals{grid-template-columns:repeat(3,1fr)}main{padding:12px}.panel{padding:14px}}
+
+.hidden{display:none!important}
+#findings .test a{display:inline-block;margin-top:6px;font-size:12px}

@@ -1,4 +1,4 @@
-# GZIP JSONL Viewer
+# SEO & AEO Auditor
 
 Chrome extension built with [WXT](https://wxt.dev/) (Manifest V3, vanilla TypeScript). Start from llms.txt, follow discovery links like a sitemap, inspect feed indexes, decompress GZIP shards, and open individual product JSON without saving an archive to Downloads.
 
@@ -44,10 +44,12 @@ No private or staging URL is hard-coded in the source. GZIP responses are decode
 
 ## In-extension cross-test runner
 
-Use the **▶ Run Tests** button in the popup or resource viewer. This opens a dedicated WXT test-runner tab (not GitHub Actions), starts at the selected website's `/llms.txt`, and runs live HTTP/data checks with your Chrome session.
+Use **▶ Run Tests** in the popup or resource viewer and choose exactly one audit mode: **AEO** or **SEO**. This opens a dedicated WXT test-runner tab (not GitHub Actions), starts at the selected website's `/llms.txt`, and runs live HTTP/data checks with your Chrome session.
 
-- **Quick:** first shard number shared by all published feed languages, three product JSON + product-detail/JSON-LD samples per checked language.
-- **Full:** all published shard numbers, three samples per shard/language; large catalogs transfer significant data and take time.
+- **AEO Quick:** first shard number shared by all published feed languages, three product JSON + product-detail/JSON-LD samples per checked language.
+- **AEO Full:** all published shard numbers, three samples per shard/language; large catalogs transfer significant data and take time.
+- **SEO Quick:** start at robots.txt and check sitemap declarations, an XML sitemap sample, and up to 15 discovered pages for HTTP, canonical, hreflang, robots meta and JSON-LD.
+- **SEO Full:** recurse through advertised same-domain XML sitemaps and inspect up to 500 page URLs, reporting all unvisited URLs as NOT RUN rather than PASS.
 - Checks include llms.txt links, same-domain/redirect checks, published index and shard counts, actual GZIP decompression/JSONL parsing, 50k item limits, duplicate SKUs, cross-language record counts/SKU order/invariant fields, and sampled single-product JSON + server-rendered Product JSON-LD.
 - Click **Stop** to cancel outstanding fetches, and **Export JSON report** to preserve all PASS/FAIL/WARNING/BLOCKED/NOT RUN findings.
 - Link and XML checks use explicit per-run limits. When not every URL/product can be verified the runner reports NOT RUN, never an unearned PASS.

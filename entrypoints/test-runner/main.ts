@@ -3,6 +3,8 @@ import {auditFeedIndex, httpUrl, isRecord, productJsonUrl} from '../../lib/feed'
 import {parseLlms, resolveLink} from '../../lib/discovery';
 import {parseSitemap} from '../../lib/sitemap';
 import {responseText} from '../../lib/decompress';
+import {AUDIT_MODES, type AuditMode} from '../../lib/audit-modes';
+import {runSeoAudit} from './seo';
 import {
   type AuditFinding, type ShardData, type ShardRecord,
   checkProduct, compareLanguageShards, parseShard, sampleProducts,
@@ -10,6 +12,8 @@ import {
 
 type Scope = 'quick' | 'full';
 interface Report {
+  mode: AuditMode;
+  plannedChecks: string[];
   startedAt: string;
   finishedAt?: string;
   origin: string;
@@ -20,6 +24,10 @@ interface Report {
   checkedLinks: number;
   stopped: boolean;
 }
+const modeInputs = Array.from(document.querySelectorAll<HTMLInputElement>('input[name="audit-mode"]'));
+const modeDescriptionEl = document.querySelector<HTMLElement>('#mode-description')!;
+const modeChecksEl = document.querySelector<HTMLUListElement>('#mode-checks')!;
+const checklistModeEl = document.querySelector<HTMLElement>('#checklist-mode')!;
 const siteEl = document.querySelector<HTMLInputElement>('#site')!;
 const scopeEl = document.querySelector<HTMLSelectElement>('#scope')!;
 const referenceEl = document.querySelector<HTMLSelectElement>('#reference')!;
@@ -64,6 +72,17 @@ function finding(id: string, level: AuditFinding['level'], summary: string,
       desc.className = 'detail';
       desc.textContent = detail.slice(0, 700);
       line.append(desc);
+    }
+    if (url) {
+      try {
+        const remote = httpUrl(url);
+        const link = document.createElement('a');
+        link.href = browser.runtime.getURL('/viewer.html') + '?url=' + encodeURIComponent(remote.href);
+        link.textContent = 'Inspect URL ↗';
+        link.target = '_blank';
+        link.rel = 'noopener';
+        line.append(link);
+      } catch { /* Ignore invalid diagnostic URLs. */ }
     }
     findingsEl.append(line);
     displayCount++;
@@ -264,7 +283,37 @@ async function checkSamples(data: ShardData, shardUrl: string, language: string,
   }
 }
 
-async function run(): Promise<void> {
+function chosenMode(): AuditMode {
+  return modeInputs.find(input => input.checked)?.value === 'seo' ? 'seo' : 'aeo';
+}
+
+function renderMode(): void {
+  const mode = chosenMode();
+  const definition = AUDIT_MODES[mode];
+  modeDescriptionEl.textContent = definition.description;
+  checklistModeEl.textContent = mode.toUpperCase();
+  modeChecksEl.replaceChildren();
+  definition.checks.forEach(check => {
+    const li = document.createElement('li');
+    li.textContent = check;
+    modeChecksEl.append(li);
+  });
+  document.querySelectorAll('.mode-card').forEach(card =>
+    card.classList.toggle('selected',
+      card.querySelector<HTMLInputElement>('input')?.checked === true));
+  document.querySelectorAll('.aeo-only').forEach(element =>
+    element.classList.toggle('hidden', mode === 'seo'));
+  browseEl.textContent = 'Explore ' + definition.startingFile.slice(1);
+  try {
+    const entered = httpUrl(siteEl.value.trim());
+    browseEl.href = browser.runtime.getURL('/viewer.html') + '?url=' +
+      encodeURIComponent(new URL(definition.startingFile, entered.origin).href);
+  } catch {
+    browseEl.href = browser.runtime.getURL('/viewer.html');
+  }
+}
+
+async function runAeo(): Promise<void> {
   if (controller) return;
   let entered: URL;
   try { entered = httpUrl(siteEl.value.trim()); }
@@ -274,6 +323,7 @@ async function run(): Promise<void> {
   const linkLimit = Number(linksEl.value);
   controller = new AbortController();
   report = {
+    mode: 'aeo', plannedChecks: [...AUDIT_MODES.aeo.checks],
     startedAt: new Date().toISOString(), origin: entered.origin, scope,
     findings: [], checkedShards: 0, sampledProducts: 0, checkedLinks: 0, stopped: false,
   };
@@ -281,6 +331,7 @@ async function run(): Promise<void> {
   displayCount = 0;
   progressEl.value = 0;
   runEl.disabled = true;
+  modeInputs.forEach(input => { input.disabled = true; });
   stopEl.disabled = false;
   exportEl.disabled = true;
   browseEl.href = browser.runtime.getURL('/viewer.html') + '?url=' + encodeURIComponent(llms.href);
@@ -297,6 +348,54 @@ async function run(): Promise<void> {
     }
     const llmsText = await llmsResponse.text();
     const parsed = parseLlms(llmsText, llms.href);
+    const agentsURL = new URL('/agents.md', entered.origin).href;
+    try {
+      step('1/5 · Reading agents.md and resolving documented endpoints…', 9);
+      const response = await fetchResponse(agentsURL);
+      if (response.ok && checkRedirect(response, entered, 'PCL-AGENTS-DOMAIN')) {
+        const body = await response.text();
+        const instructions = parseLlms(body, agentsURL);
+        const docs = instructions.groups.flatMap(group => group.links);
+        finding('PCL-AGENTS', docs.length ? 'pass' : 'warning',
+          'agents.md HTTP 200: ' + docs.length + ' endpoint URL(s) extracted.',
+          docs.length ? undefined : 'No HTTP(S) endpoint links could be extracted.', agentsURL);
+        let tested = 0;
+        let templated = 0;
+        for (const link of docs) {
+          assertActive();
+          if (link.placeholders.length) {
+            templated++;
+            continue;
+          }
+          const target = resolveLink(link, agentsURL);
+          if (!target) continue;
+          if (/\/api\/ucp\/mcp\/?$/i.test(new URL(target).pathname)) {
+            finding('PCL-AGENTS-MCP', 'not-run',
+              'MCP POST endpoint needs its protocol-specific payload and authorization.',
+              'A GET link check is not evidence that a POST endpoint works.', target);
+            continue;
+          }
+          if (++tested <= (scope === 'quick' ? 10 : 40)) {
+            await checkLink(target, 'PCL-AGENTS-LINK-' + tested, entered);
+          }
+        }
+        const untested = Math.max(0, tested - (scope === 'quick' ? 10 : 40));
+        if (templated) finding('PCL-AGENTS-TEMPLATES', 'not-run',
+          templated + ' template endpoint(s) need real SKU/language/shard substitution.',
+          'The product JSON and actual published shard checks below cover representative real URLs.', agentsURL);
+        if (untested) finding('PCL-AGENTS-SCOPE', 'not-run',
+          untested + ' additional agents.md endpoint link(s) were skipped by this run.', undefined, agentsURL);
+      } else {
+        finding('PCL-AGENTS', 'fail',
+          'agents.md unavailable or redirects outside the selected domain: HTTP ' + response.status,
+          undefined, agentsURL);
+        if (response.body) await response.body.cancel();
+      }
+    } catch (error) {
+      assertActive();
+      finding('PCL-AGENTS', 'fail', 'agents.md could not be loaded',
+        error instanceof Error ? error.message : String(error), agentsURL);
+    }
     finding('PCL-LLMS', parsed.links ? 'pass' : 'warning',
       'llms.txt available: ' + parsed.links + ' discoverable links',
       undefined, llms.href);
@@ -391,10 +490,11 @@ async function run(): Promise<void> {
     const declaredLanguages = index.languages;
     const languagesFromLlms = parsed.languages;
     const missingFromIndex = languagesFromLlms.filter(lang => !declaredLanguages.includes(lang));
-    finding('PCL-LANG', missingFromIndex.length ? 'fail' : 'pass',
-      'Language declarations: ' + declaredLanguages.join(', '),
-      missingFromIndex.length ? 'In llms.txt but missing from feed index: ' +
-        missingFromIndex.join(', ') : 'All languages declared in llms.txt have shards.');
+    finding('PCL-LANG', missingFromIndex.length ? 'warning' : 'pass',
+      'Published feed languages: ' + declaredLanguages.join(', '),
+      missingFromIndex.length ? 'Storefront languages without a published feed: ' +
+        missingFromIndex.join(', ') + '. Confirm whether the feed supports a smaller subset.' :
+        'All storefront languages listed in llms.txt have a published feed.');
     const reference = declaredLanguages.includes(referenceEl.value) ? referenceEl.value :
       declaredLanguages[0];
     if (!reference) {
@@ -481,13 +581,68 @@ async function run(): Promise<void> {
     if (report) report.finishedAt = new Date().toISOString();
     controller = null;
     runEl.disabled = false;
+    modeInputs.forEach(input => { input.disabled = false; });
     stopEl.disabled = true;
     exportEl.disabled = !report;
     refresh();
   }
 }
 
-runEl.addEventListener('click', () => { void run(); });
+async function runSeo(): Promise<void> {
+  if (controller) return;
+  let entered: URL;
+  try { entered = httpUrl(siteEl.value.trim()); }
+  catch { activityEl.textContent = 'Enter a valid HTTP(S) site URL.'; return; }
+  const scope = scopeEl.value as Scope;
+  controller = new AbortController();
+  report = {
+    mode: 'seo', plannedChecks: [...AUDIT_MODES.seo.checks],
+    startedAt: new Date().toISOString(), origin: entered.origin, scope,
+    findings: [], checkedShards: 0, sampledProducts: 0, checkedLinks: 0, stopped: false,
+  };
+  findingsEl.replaceChildren();
+  displayCount = 0;
+  progressEl.value = 0;
+  runEl.disabled = true;
+  modeInputs.forEach(input => { input.disabled = true; });
+  stopEl.disabled = false;
+  exportEl.disabled = true;
+  const robotsURL = new URL('/robots.txt', entered.origin).href;
+  browseEl.href = browser.runtime.getURL('/viewer.html') + '?url=' +
+    encodeURIComponent(robotsURL);
+  void browser.storage.local.set({lastUrl: robotsURL});
+  try {
+    await runSeoAudit({
+      root: entered, scope,
+      fetchPage: fetchResponse, report: finding, redirectOK: checkRedirect,
+      progress: step, assertActive, linkChecked: () => { if (report) report.checkedLinks++; },
+    });
+  } catch (error) {
+    if (controller?.signal.aborted) {
+      finding('SEO-RUN-STOPPED', 'blocked',
+        'Audit stopped by user; partial results can still be exported.');
+      report.stopped = true;
+      step('Stopped. Review or export the partial report.', progressEl.value);
+    } else {
+      finding('SEO-RUN-ERROR', 'fail', 'SEO audit interrupted unexpectedly',
+        error instanceof Error ? error.message : String(error));
+    }
+  } finally {
+    if (report) report.finishedAt = new Date().toISOString();
+    controller = null;
+    runEl.disabled = false;
+    modeInputs.forEach(input => { input.disabled = false; });
+    stopEl.disabled = true;
+    exportEl.disabled = !report;
+    refresh();
+  }
+}
+
+runEl.addEventListener('click', () => {
+  void (chosenMode() === 'seo' ? runSeo() : runAeo());
+});
+modeInputs.forEach(input => input.addEventListener('change', renderMode));
+siteEl.addEventListener('input', renderMode);
 stopEl.addEventListener('click', () => { controller?.abort(); });
 exportEl.addEventListener('click', () => {
   if (!report) return;
@@ -495,7 +650,7 @@ exportEl.addEventListener('click', () => {
   const href = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = href;
-  anchor.download = 'seo-cross-test-' + new Date().toISOString().slice(0, 19).replace(/:/g, '-') + '.json';
+  anchor.download = (report.mode === 'aeo' ? 'aeo-audit-' : 'seo-audit-') + new Date().toISOString().slice(0, 19).replace(/:/g, '-') + '.json';
   anchor.click();
   setTimeout(() => URL.revokeObjectURL(href), 10000);
 });
@@ -503,11 +658,10 @@ void browser.storage.local.get('lastUrl').then(({lastUrl}) => {
   const provided = new URLSearchParams(location.search).get('url');
   if (provided) siteEl.value = provided;
   else if (typeof lastUrl === 'string') siteEl.value = lastUrl;
-  try {
-    const site = httpUrl(siteEl.value);
-    browseEl.href = browser.runtime.getURL('/viewer.html') + '?url=' +
-      encodeURIComponent(new URL('/llms.txt', site.origin).href);
-  } catch {
-    browseEl.href = browser.runtime.getURL('/viewer.html');
+  const initialMode = new URLSearchParams(location.search).get('mode');
+  if (initialMode === 'seo') {
+    const seo = modeInputs.find(input => input.value === 'seo');
+    if (seo) seo.checked = true;
   }
+  renderMode();
 });
