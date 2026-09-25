@@ -1,12 +1,15 @@
 import { defineConfig } from 'wxt';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
+  modules: ['@wxt-dev/module-react'],
+  vite: () => ({ plugins: [tailwindcss()] }),
   manifest: {
     name: 'SEO & AEO Auditor',
-    version: '1.5.0',
-    description: 'Run AEO and SEO website audits or explore llms.txt, sitemaps and product feeds.',
+    version: '1.6.0',
+    description: 'Audit AEO and SEO with an accessible beUI-powered Chrome interface.',
     permissions: ['tabs', 'storage'],
-    // The URL is chosen by the user; the viewer does not send data to another service.
+    // Users choose arbitrary site origins; no staging endpoint is embedded.
     host_permissions: ['<all_urls>'],
   },
 });

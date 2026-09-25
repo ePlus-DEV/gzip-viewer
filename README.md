@@ -1,6 +1,17 @@
-# SEO & AEO Auditor
+# SEO & AEO Auditor — beUI Redesign
 
-Chrome extension built with [WXT](https://wxt.dev/) (Manifest V3, vanilla TypeScript). Start from llms.txt, follow discovery links like a sitemap, inspect feed indexes, decompress GZIP shards, and open individual product JSON without saving an archive to Downloads.
+Chrome extension built with [WXT](https://wxt.dev/) (Manifest V3), React 19, Tailwind CSS 4 and actual MIT-licensed [beUI components](https://github.com/starc007/ui-components). Start from llms.txt, follow discovery links like a sitemap, inspect feed indexes, decompress GZIP shards, and open individual product JSON without saving an archive to Downloads.
+
+## beUI interface
+
+This branch gives all three extension surfaces a unified, responsive beUI workspace while preserving the existing AEO and SEO test engine:
+
+- **Popup:** React + actual beUI animated badges and motion buttons. Choose AEO/SEO, Quick/Full, inspect the current tab or enter an arbitrary HTTP(S) origin; open Run Tests or Resource Explorer.
+- **Test runner:** A responsive React dashboard using beUI Button and AnimatedBadge components. The existing DOM-based live audit engine is initialized after React mounts; its selectors and report format are preserved.
+- **Resource explorer:** A beUI React shell with working Back, Home, search, display limit, Reload and Run Tests; retain all existing LLMS, XML, JSON and GZIP inspection logic.
+- Respect system dark mode and reduced-motion settings; avoid shipping font binaries or remote CSS/JS.
+
+The MIT-licensed upstream sources are vendored under `components/beui/` (attribution and original license: `THIRD_PARTY_LICENSES.md`). Source paths are made local to work inside WXT without external runtime dependencies.
 
 ## Develop locally
 
@@ -25,8 +36,11 @@ No private or staging URL is hard-coded in the source. GZIP responses are decode
 ## Project structure
 
 - `wxt.config.ts`: manifest metadata and permissions (WXT generates `manifest.json`).
-- `entrypoints/popup/`: extension URL form.
-- `entrypoints/viewer/`: standalone unlisted WXT viewer page, built as `/viewer.html`.
+- `entrypoints/popup/`: beUI React popup (mode/scope selection and Run Tests).
+- `entrypoints/viewer/`: beUI React resource-explorer shell and unchanged URL-driven document logic.
+- `entrypoints/test-runner/`: beUI React dashboard plus existing AEO and SEO live test engines.
+- `assets/beui.css`: Tailwind theme tokens and locally bundled beUI styles.
+- `components/beui/`: vendored upstream beUI motion buttons, badges, number, hooks and tokens.
 - `lib/feed.ts`: feed-index metadata validation, product warnings, JSONL parsing and URL derivation.
 - `lib/discovery.ts`: parse llms.txt links and resolve URL templates.
 - `lib/navigation.ts`: durable URL-based breadcrumbs and Back/Home navigation.

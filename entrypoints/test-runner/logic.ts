@@ -24,6 +24,7 @@ interface Report {
   checkedLinks: number;
   stopped: boolean;
 }
+export function initializeAuditRunner(): void {
 const modeInputs = Array.from(document.querySelectorAll<HTMLInputElement>('input[name="audit-mode"]'));
 const modeDescriptionEl = document.querySelector<HTMLElement>('#mode-description')!;
 const modeChecksEl = document.querySelector<HTMLUListElement>('#mode-checks')!;
@@ -658,6 +659,8 @@ void browser.storage.local.get('lastUrl').then(({lastUrl}) => {
   const provided = new URLSearchParams(location.search).get('url');
   if (provided) siteEl.value = provided;
   else if (typeof lastUrl === 'string') siteEl.value = lastUrl;
+  const initialScope = new URLSearchParams(location.search).get('scope');
+  if (initialScope === 'full' || initialScope === 'quick') scopeEl.value = initialScope;
   const initialMode = new URLSearchParams(location.search).get('mode');
   if (initialMode === 'seo') {
     const seo = modeInputs.find(input => input.value === 'seo');
@@ -665,3 +668,5 @@ void browser.storage.local.get('lastUrl').then(({lastUrl}) => {
   }
   renderMode();
 });
+
+}
