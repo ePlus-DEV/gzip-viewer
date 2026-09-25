@@ -138,6 +138,27 @@ try {
   assert.ok(pass>=3,'AEO must execute real HTTP/data checks, not just display the UI.');
   assert.match(await page.locator('#elapsed').innerText(),/^\d\d:\d\d:\d\d$/,'Timing must show elapsed duration.');
   console.log('AEO smoke PASS: '+pass+' live checks.');
+  // The live stream must default to newest-first, independently of severity.
+  const sort=page.locator('#result-sort');
+  assert.equal(await sort.inputValue(),'newest','Newest-first must be the default.');
+  const newest=await page.locator('#findings .id').allTextContents();
+  assert.ok(newest.length>=4,'Smoke fixture should produce several sortable results.');
+  await sort.selectOption('oldest');
+  await page.waitForFunction(first=>
+    document.querySelector('#findings .id')?.textContent!==first,
+    newest[0],
+  );
+  const oldest=await page.locator('#findings .id').allTextContents();
+  assert.deepEqual(oldest,[...newest].reverse(),
+    'Oldest first must show the reverse of the original live event order.');
+  await sort.selectOption('severity');
+  const severityOrder=await page.locator('#findings .status').allTextContents();
+  const severityRank={FAIL:0,BLOCKED:1,WARNING:2,'NOT-RUN':3,PASS:4};
+  for(let i=1;i<severityOrder.length;i++){
+    assert.ok(severityRank[severityOrder[i-1]]<=severityRank[severityOrder[i]],
+      'Failures first must group findings by severity.');
+  }
+  await sort.selectOption('newest');
   await page.screenshot({path:'artifacts/aeo-results.png',fullPage:true});
 
   await page.reload({waitUntil:'networkidle'});

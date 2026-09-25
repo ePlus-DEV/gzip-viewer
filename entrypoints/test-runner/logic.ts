@@ -36,7 +36,7 @@ interface Report {
 export function initializeAuditRunner(): void {
 const required=['site','scope','reference','links','run','stop','export','browse','activity','progress',
   'findings','summary','notification-status','elapsed','remaining','finish-at','duration-label',
-  'remaining-label','finish-label','timing-note','result-filter','result-query','results-visible'];
+  'remaining-label','finish-label','timing-note','result-filter','result-sort','result-query','results-visible'];
 const missing=required.filter(id=>!document.getElementById(id));
 if(missing.length)throw new Error('Audit dashboard missing: '+missing.join(', '));
 if(document.documentElement.dataset.auditRunnerReady==='true')return;
@@ -65,6 +65,7 @@ let displayCount = 0;
 const findingList=createFindingList(
   findingsEl,
   document.querySelector<HTMLSelectElement>('#result-filter')!,
+  document.querySelector<HTMLSelectElement>('#result-sort')!,
   document.querySelector<HTMLInputElement>('#result-query')!,
   document.querySelector<HTMLElement>('#results-visible')!,
 );
