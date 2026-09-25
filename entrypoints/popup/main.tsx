@@ -10,7 +10,7 @@ import {Switch} from '../../components/beui/switch';
 import {httpUrl} from '../../lib/feed';
 import type {AuditMode, TestScope} from '../../lib/audit-modes';
 import {COMPLETION_NOTIFICATION_KEY} from '../../lib/audit-notifications';
-import {auditLaunchUrl} from '../../lib/audit-launch';
+import {auditEntryUrl, auditLaunchUrl} from '../../lib/audit-launch';
 import '../../assets/beui.css';
 import './style.css';
 
@@ -31,16 +31,32 @@ function App() {
       browser.tabs.query({active: true, currentWindow: true}),
     ]).then(([saved, tabs]) => {
       if (!alive) return;
+      const selectedMode: AuditMode = saved.auditMode === 'seo' ? 'seo' : 'aeo';
       const active = tabs[0]?.url;
-      setSite(typeof active === 'string' && /^https?:\/\//i.test(active)
-        ? active : typeof saved.lastUrl === 'string' ? saved.lastUrl : '');
+      const source = typeof active === 'string' && /^https?:\/\//i.test(active)
+        ? active : typeof saved.lastUrl === 'string' ? saved.lastUrl : '';
+      if (source) {
+        try { setSite(auditEntryUrl(source, selectedMode)); }
+        catch { setSite(source); }
+      }
       if (typeof saved.lastUrl === 'string') setLastUrl(saved.lastUrl);
-      if (saved.auditMode === 'aeo' || saved.auditMode === 'seo') setMode(saved.auditMode);
+      setMode(selectedMode);
       if (saved.auditScope === 'quick' || saved.auditScope === 'full') setScope(saved.auditScope);
       setNotifyOnComplete(saved[COMPLETION_NOTIFICATION_KEY] === true);
     }).catch(() => { if (alive) setError('Unable to read saved preferences. Enter a URL to continue.'); });
     return () => { alive = false; };
   }, []);
+
+  function normalizeTarget(value: string, nextMode: AuditMode = mode): string {
+    if (!value.trim()) return value;
+    try { return auditEntryUrl(value, nextMode); }
+    catch { return value; }
+  }
+
+  function changeMode(nextMode: AuditMode) {
+    setMode(nextMode);
+    setSite(current => normalizeTarget(current, nextMode));
+  }
 
   async function changeNotifications(enabled: boolean) {
     try {
@@ -56,13 +72,13 @@ function App() {
     let parsed: URL;
     try { parsed = httpUrl((saved ?? site).trim()); }
     catch { setError('Enter a valid HTTP(S) website URL.'); return; }
-    const documentUrl = new URL(mode === 'aeo' ? '/llms.txt' : '/robots.txt', parsed.origin).href;
+    const documentUrl = auditEntryUrl(parsed.href, mode);
     setBusy(true);
     setError('');
     try {
-      await browser.storage.local.set({lastUrl: parsed.href, auditMode: mode, auditScope: scope});
+      await browser.storage.local.set({lastUrl: documentUrl, auditMode: mode, auditScope: scope});
       const destination = kind === 'audit'
-        ? auditLaunchUrl(browser.runtime.getURL('/test-runner.html'), parsed.href, mode, scope)
+        ? auditLaunchUrl(browser.runtime.getURL('/test-runner.html'), documentUrl, mode, scope)
         : browser.runtime.getURL('/viewer.html') + '?url=' +
           encodeURIComponent(kind === 'direct' ? parsed.href : documentUrl);
       await browser.tabs.create({url: destination});
@@ -80,7 +96,7 @@ function App() {
           <div className="brand-symbol"><img src="/icon-48.png" width={40} height={40} alt=""/></div>
           <div><strong>SEO <span>&amp;</span> AEO Auditor</strong><small>Website quality workspace</small></div>
         </div>
-        <AnimatedBadge status="info" size="sm" showIcon={false}>v1.9.2</AnimatedBadge>
+        <AnimatedBadge status="info" size="sm" showIcon={false}>v1.9.3</AnimatedBadge>
       </header>
 
       <section className="popup-hero">
@@ -97,7 +113,7 @@ function App() {
             return (
               <Button type="button" variant="ghost" size="md" role="radio" aria-checked={mode === value} key={value}
                 className={'mode-option ' + (mode === value ? 'selected' : '')}
-                onClick={() => setMode(value)}>
+                onClick={() => changeMode(value)}>
                 <span className={'mode-icon ' + value}><SelectedIcon size={20}/></span>
                 <span className="mode-copy"><strong>{value.toUpperCase()} Audit</strong>
                   <small>{value === 'aeo' ? 'LLMS, agents & product feeds' : 'Sitemaps, indexing & schema'}</small>
@@ -110,14 +126,20 @@ function App() {
       </section>
 
       <section className="popup-section">
-        <div className="section-caption"><label htmlFor="site">Target website</label><span>02 / 03</span></div>
+        <div className="section-caption"><label htmlFor="site">Audit entry point</label><span>02 / 03</span></div>
         <Input id="site" type="url" inputMode="url" autoComplete="url" value={site}
-          onChange={setSite} placeholder="https://example.com"
-          onKeyDown={event => {if(event.key === 'Enter')void open('audit');}}
+          onChange={setSite} onBlur={() => setSite(current => normalizeTarget(current))}
+          placeholder={mode === 'aeo' ? 'https://example.com/llms.txt' : 'https://example.com/robots.txt'}
+          onKeyDown={event => {
+            if(event.key === 'Enter') {
+              setSite(current => normalizeTarget(current));
+              void open('audit');
+            }
+          }}
           leftIcon={<Globe2 size={18}/>} className="popup-site-input"
           classNames={{field:"website-field",input:"popup-site-text"}}/>
         <div className="source-hint"><FileJson2 size={13}/>
-          Starts at {mode === 'aeo' ? '/llms.txt' : '/robots.txt'}
+          Same entry point used by the full audit dashboard
         </div>
       </section>
 

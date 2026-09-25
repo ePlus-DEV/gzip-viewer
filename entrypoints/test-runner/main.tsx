@@ -98,7 +98,7 @@ function App() {
           <div className="sidebar-info"><ShieldCheck size={17}/>
             <span>Site data is fetched using your current Chrome session. No external uploads.</span>
           </div>
-          <div className="sidebar-credit">SEO &amp; AEO Auditor <span>v1.9.2</span></div>
+          <div className="sidebar-credit">SEO &amp; AEO Auditor <span>v1.9.3</span></div>
         </aside>
 
         <main className="audit-content">
@@ -144,7 +144,7 @@ function App() {
               <div><h2>Target and scope</h2><p>Select any website that your browser can access.</p></div>
               <span className="step-count">STEP 02</span>
             </div>
-            <label htmlFor="site" className="input-label">Website URL</label>
+            <label htmlFor="site" className="input-label">Audit entry point</label>
             <Input id="site" type="url" value={site} onChange={setSite}
               autoComplete="url" placeholder="https://example.com"
               leftIcon={<Globe2 size={17}/>} className="audit-site-input"

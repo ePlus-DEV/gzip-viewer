@@ -115,7 +115,10 @@ try {
   popup.on('pageerror',error=>exceptions.push('popup: '+(error.stack||error.message)));
   await popup.setViewportSize({width:460,height:840});
   await popup.goto('chrome-extension://'+id+'/popup.html',{waitUntil:'networkidle'});
-  await popup.locator('#site').fill(sites.origin+'/llms.txt');
+  await popup.locator('#site').fill(sites.origin+'/feeds/products.json');
+  await popup.locator('#site').blur();
+  assert.equal(await popup.locator('#site').inputValue(),sites.origin+'/llms.txt',
+    'AEO popup target must visibly match the full runner entry point.');
   await assertIconDoesNotOverlap(popup,'.popup-site-input','Popup target URL');
   await popup.screenshot({path:'artifacts/popup.png',fullPage:true});
   const newTab=context.waitForEvent('page',{timeout:25000});
@@ -132,6 +135,8 @@ try {
     'Popup must open the selected audit mode.');
   assert.equal(new URL(page.url()).searchParams.get('scope'),'quick',
     'Popup must preserve the requested test scope.');
+  assert.equal(await page.locator('#site').inputValue(),sites.origin+'/llms.txt',
+    'Popup and full runner must display the same AEO target.');
   console.log('Popup smoke PASS: Run AEO Tests opens the real audit runner.');
   await page.screenshot({path:'artifacts/audit-dashboard.png',fullPage:true});
   // A single popup click must START AND FINISH the audit, with no second click.
@@ -204,6 +209,8 @@ try {
   await seoPopup.goto('chrome-extension://'+id+'/popup.html',{waitUntil:'networkidle'});
   await seoPopup.locator('#site').fill(sites.origin+'/en/product/test-item');
   await seoPopup.getByRole('radio',{name:/SEO Audit/i}).click();
+  assert.equal(await seoPopup.locator('#site').inputValue(),sites.origin+'/robots.txt',
+    'Switching to SEO must immediately normalize the popup target to robots.txt.');
   const seoTabPromise=context.waitForEvent('page',{timeout:25000});
   await seoPopup.getByRole('button',{name:/Run SEO Tests/i}).click();
   const seoPage=await seoTabPromise;
