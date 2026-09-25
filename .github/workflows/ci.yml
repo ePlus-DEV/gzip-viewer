@@ -7,18 +7,27 @@ on:
 
 jobs:
   test-and-build:
+    name: Unit, browser smoke and extension build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
       - run: npm install --no-audit --no-fund
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
+      - name: TypeScript gate
+        run: npm run typecheck
+      - name: Unit-test gate
+        run: npm test
+      - name: Build Chrome extension
+        run: npm run build
+      - name: Browser smoke — real AEO and SEO Run Tests
+        run: npm run test:smoke
       - uses: actions/upload-artifact@v4
+        if: success()
         with:
-          name: gzip-viewer-chrome
+          name: seo-aeo-auditor-chrome
           path: .output/chrome-mv3/
           if-no-files-found: error
