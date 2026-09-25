@@ -30,6 +30,12 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: success()
         with:
+          name: audit-dashboard-preview
+          path: artifacts/*.png
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
           name: seo-aeo-auditor-chrome
           path: .output/chrome-mv3/
           if-no-files-found: error

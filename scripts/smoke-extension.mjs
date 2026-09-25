@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
-import {mkdtemp, rm, access} from 'node:fs/promises';
+import {mkdtemp, rm, mkdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
 import {chromium} from 'playwright';
@@ -83,15 +83,28 @@ try {
   const sw=context.serviceWorkers()[0] || await context.waitForEvent('serviceworker',{timeout:30000});
   const id=new URL(sw.url()).hostname;
   assert.match(id,/^[a-p]{32}$/);
-  const page=await context.newPage();
+  await mkdir('artifacts',{recursive:true});
   const exceptions=[];
+  const popup=await context.newPage();
+  popup.on('pageerror',error=>exceptions.push('popup: '+(error.stack||error.message)));
+  await popup.setViewportSize({width:460,height:840});
+  await popup.goto('chrome-extension://'+id+'/popup.html',{waitUntil:'networkidle'});
+  await popup.locator('#site').fill(sites.origin+'/llms.txt');
+  await popup.screenshot({path:'artifacts/popup.png',fullPage:true});
+  const newTab=context.waitForEvent('page',{timeout:25000});
+  await popup.getByRole('button',{name:/Run AEO Tests/i}).click();
+  const page=await newTab;
+  await page.waitForURL(/chrome-extension:\/\/[^/]+\/test-runner\.html/,{timeout:20000});
+  await page.setViewportSize({width:1440,height:1000});
   page.on('pageerror',error=>exceptions.push(error.stack||error.message));
   page.on('console',message=>{if(message.type()==='error')exceptions.push('console: '+message.text());});
-  const url='chrome-extension://'+id+'/test-runner.html?url='+
-    encodeURIComponent(sites.origin+'/llms.txt')+'&mode=aeo&scope=quick';
-  await page.goto(url,{waitUntil:'networkidle'});
   await page.locator('#run').waitFor({state:'visible'});
-  await page.locator('#site').fill(sites.origin+'/llms.txt');
+  assert.equal(new URL(page.url()).searchParams.get('mode'),'aeo',
+    'Popup must open the selected audit mode.');
+  assert.equal(new URL(page.url()).searchParams.get('scope'),'quick',
+    'Popup must preserve the requested test scope.');
+  console.log('Popup smoke PASS: Run AEO Tests opens the real audit runner.');
+  await page.screenshot({path:'artifacts/audit-dashboard.png',fullPage:true});
   assert.equal(await page.locator('#run').isEnabled(),true,'Run Tests should start enabled.');
   await page.locator('#run').click();
   await page.waitForFunction(()=>
@@ -103,6 +116,7 @@ try {
   assert.ok(pass>=3,'AEO must execute real HTTP/data checks, not just display the UI.');
   assert.match(await page.locator('#elapsed').innerText(),/^\d\d:\d\d:\d\d$/,'Timing must show elapsed duration.');
   console.log('AEO smoke PASS: '+pass+' live checks.');
+  await page.screenshot({path:'artifacts/aeo-results.png',fullPage:true});
 
   await page.locator('input[name="audit-mode"][value="seo"]').check({force:true});
   await page.locator('#scope').selectOption('quick');
@@ -115,8 +129,9 @@ try {
   const seoPass=Number(await page.locator('#passed').innerText());
   assert.ok(seoPass>=3,'SEO must crawl a real XML sitemap and page.');
   console.log('SEO smoke PASS: '+seoPass+' live checks.');
+  await page.screenshot({path:'artifacts/seo-results.png',fullPage:true});
   assert.deepEqual(exceptions,[],'Extension raised unexpected runtime or browser console errors.');
-  console.log('Extension smoke passed: both mode buttons dispatch actual tests.');
+  console.log('Extension smoke passed: popup navigation and both mode buttons dispatch actual tests.');
 } finally {
   await context?.close();
   await new Promise(resolvePromise=>server.close(resolvePromise));
