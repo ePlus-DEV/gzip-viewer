@@ -6,7 +6,7 @@ export default defineConfig({
   vite: () => ({ plugins: [tailwindcss()] }),
   manifest: {
     name: 'SEO & AEO Auditor',
-    version: '1.6.0',
+    version: '1.7.0',
     description: 'Audit AEO and SEO with an accessible beUI-powered Chrome interface.',
     permissions: ['tabs', 'storage'],
     // Users choose arbitrary site origins; no staging endpoint is embedded.

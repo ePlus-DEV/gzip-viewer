@@ -70,3 +70,9 @@ Use **▶ Run Tests** in the popup or resource viewer and choose exactly one aud
 - Live site tests need Chrome network access. A full database-to-feed SKU coverage proof still needs a database/source export and is explicitly marked NOT RUN.
 
 Source URLs are entered by the user. No staging URL, secret or credentials are committed into this repository.
+
+## Back to top and runtime metrics
+
+The live audit dashboard shows **elapsed wall-clock time**, **approximate remaining time**, and **expected finish** while tests are running. An estimate appears only after at least two comparable shard groups (AEO) or page checks (SEO); discovery and sitemap size cannot be reliably predicted in advance. The estimate concerns the current processing stage and may change when network latency or shard size varies. Once the run completes or is stopped, the dashboard displays **actual total runtime** and the local finish time. Exported JSON includes `startedAt`, `finishedAt` and `durationMs`.
+
+A floating **Back to top** control appears in both the audit dashboard and Resource Explorer after scrolling down. It respects `prefers-reduced-motion` and remains keyboard accessible.

@@ -67,7 +67,7 @@ function App() {
           <div className="brand-symbol"><Radar size={21} strokeWidth={2.2}/></div>
           <div><strong>SEO <span>&amp;</span> AEO Auditor</strong><small>Website quality workspace</small></div>
         </div>
-        <AnimatedBadge status="info" size="sm" showIcon={false}>v1.6</AnimatedBadge>
+        <AnimatedBadge status="info" size="sm" showIcon={false}>v1.7</AnimatedBadge>
       </header>
 
       <section className="popup-hero">

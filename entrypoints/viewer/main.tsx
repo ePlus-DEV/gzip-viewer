@@ -4,6 +4,7 @@ import {ArrowLeft, ChevronRight, Compass, House, Layers3, Play, Radar, RotateCw,
 import {Button} from '../../components/beui/button';
 import {AnimatedBadge} from '../../components/beui/animated-badge';
 import {initializeViewer} from './logic';
+import {BackToTop} from '../../components/BackToTop';
 import '../../assets/beui.css';
 import './style.css';
 
@@ -66,6 +67,7 @@ function Explorer() {
           <main id="items"/>
         </div>
       </div>
+      <BackToTop/>
     </div>
   );
 }

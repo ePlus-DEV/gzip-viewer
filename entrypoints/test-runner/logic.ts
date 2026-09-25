@@ -5,6 +5,7 @@ import {parseSitemap} from '../../lib/sitemap';
 import {responseText} from '../../lib/decompress';
 import {AUDIT_MODES, type AuditMode} from '../../lib/audit-modes';
 import {runSeoAudit} from './seo';
+import {estimateStageRemainingMs, formatDuration, stageFromMessage, type AuditStage} from '../../lib/audit-timing';
 import {
   type AuditFinding, type ShardData, type ShardRecord,
   checkProduct, compareLanguageShards, parseShard, sampleProducts,
@@ -16,6 +17,7 @@ interface Report {
   plannedChecks: string[];
   startedAt: string;
   finishedAt?: string;
+  durationMs?: number;
   origin: string;
   scope: Scope;
   findings: AuditFinding[];
@@ -45,6 +47,111 @@ let controller: AbortController | null = null;
 let report: Report | null = null;
 let displayCount = 0;
 const MAX_VISIBLE = 500;
+
+// Wall-clock duration continues to be accurate if Chrome throttles background tabs.
+// ETA is deliberately stage-specific: sitemap/page/shard work is not uniform.
+const elapsedEl = document.querySelector<HTMLElement>('#elapsed')!;
+const remainingEl = document.querySelector<HTMLElement>('#remaining')!;
+const finishEl = document.querySelector<HTMLElement>('#finish-at')!;
+const durationLabelEl = document.querySelector<HTMLElement>('#duration-label')!;
+const remainingLabelEl = document.querySelector<HTMLElement>('#remaining-label')!;
+const finishLabelEl = document.querySelector<HTMLElement>('#finish-label')!;
+const timingNoteEl = document.querySelector<HTMLElement>('#timing-note')!;
+let clockStartedAt: number | null = null;
+let clockInterval: number | null = null;
+let clockStage: {
+  name: AuditStage;
+  startedAt: number;
+  completed: number | null;
+  total: number | null;
+} | null = null;
+
+function displayLocalTime(value: number): string {
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(new Date(value));
+}
+
+function updateClock(): void {
+  if (clockStartedAt === null || !controller) return;
+  const now = Date.now();
+  elapsedEl.textContent = formatDuration(now - clockStartedAt);
+  // Number of sitemap URLs to discover is unknown in advance. Do not estimate
+  // the time to finish 100 sitemaps when the index may contain just two.
+  if (!clockStage || clockStage.name === 'seo-sitemaps' ||
+      clockStage.completed === null || clockStage.total === null) {
+    remainingEl.textContent = 'Calculating…';
+    finishEl.textContent = '—';
+    timingNoteEl.textContent = 'ETA appears after at least two comparable shard groups or pages have completed.';
+    return;
+  }
+  const remaining = estimateStageRemainingMs(
+    clockStage.completed, clockStage.total, now - clockStage.startedAt,
+  );
+  if (remaining === null) {
+    remainingEl.textContent = clockStage.completed === clockStage.total
+      ? 'Finalizing…' : 'Calculating…';
+    finishEl.textContent = '—';
+    timingNoteEl.textContent = 'Measuring completed work. Time varies by network, shard size and site response.';
+    return;
+  }
+  remainingEl.textContent = '≈ ' + formatDuration(remaining);
+  finishEl.textContent = displayLocalTime(now + remaining);
+  const stage = clockStage.name === 'aeo-shards' ? 'shard comparison' : 'page checks';
+  timingNoteEl.textContent = 'Approximate finish for the current ' + stage +
+    ' stage only; later processing and network delays can change it.';
+}
+
+function observeProgress(message: string): void {
+  const observation = stageFromMessage(message);
+  if (observation) {
+    if (!clockStage || clockStage.name !== observation.stage) {
+      clockStage = {
+        name: observation.stage, startedAt: Date.now(), completed: null, total: null,
+      };
+    }
+    if (observation.completed !== null && observation.total !== null) {
+      clockStage.completed = observation.completed;
+      clockStage.total = observation.total;
+    }
+  } else if (/\b(?:Finished|Stopped|interrupted)\b/i.test(message)) {
+    clockStage = null;
+  }
+  updateClock();
+}
+
+function startClock(): void {
+  if (clockInterval !== null) window.clearInterval(clockInterval);
+  clockStartedAt = Date.parse(report!.startedAt);
+  clockStage = null;
+  durationLabelEl.textContent = 'Time elapsed';
+  remainingLabelEl.textContent = 'Estimated remaining';
+  finishLabelEl.textContent = 'Expected finish';
+  remainingEl.textContent = 'Calculating…';
+  finishEl.textContent = '—';
+  timingNoteEl.textContent = 'ETA appears after at least two comparable shard groups or pages have completed.';
+  updateClock();
+  clockInterval = window.setInterval(updateClock, 1000);
+}
+
+function finishClock(): void {
+  if (clockInterval !== null) window.clearInterval(clockInterval);
+  clockInterval = null;
+  const finished = report?.finishedAt ? Date.parse(report.finishedAt) : Date.now();
+  const duration = Math.max(0, finished - (clockStartedAt ?? finished));
+  if (report) report.durationMs = duration;
+  durationLabelEl.textContent = 'Total runtime';
+  elapsedEl.textContent = formatDuration(duration);
+  remainingLabelEl.textContent = 'Run status';
+  remainingEl.textContent = report?.stopped ? 'Stopped' :
+    report?.findings.some(f => f.id.endsWith('RUN-ERROR')) ? 'Interrupted' : 'Completed';
+  finishLabelEl.textContent = report?.stopped ? 'Stopped at' : 'Finished at';
+  finishEl.textContent = displayLocalTime(finished);
+  timingNoteEl.textContent = 'Actual wall-clock runtime. The exported JSON report includes startedAt, finishedAt and durationMs.';
+  clockStartedAt = null;
+  clockStage = null;
+}
+
 
 function finding(id: string, level: AuditFinding['level'], summary: string,
   detail?: string, url?: string): void {
@@ -107,6 +214,7 @@ function refresh(): void {
 function step(message: string, progress: number): void {
   activityEl.textContent = message;
   progressEl.value = Math.min(100, Math.max(0, Math.round(progress)));
+  observeProgress(message);
 }
 
 function assertActive(): void {
@@ -331,6 +439,7 @@ async function runAeo(): Promise<void> {
   findingsEl.replaceChildren();
   displayCount = 0;
   progressEl.value = 0;
+  startClock();
   runEl.disabled = true;
   modeInputs.forEach(input => { input.disabled = true; });
   stopEl.disabled = false;
@@ -580,6 +689,7 @@ async function runAeo(): Promise<void> {
     }
   } finally {
     if (report) report.finishedAt = new Date().toISOString();
+    finishClock();
     controller = null;
     runEl.disabled = false;
     modeInputs.forEach(input => { input.disabled = false; });
@@ -604,6 +714,7 @@ async function runSeo(): Promise<void> {
   findingsEl.replaceChildren();
   displayCount = 0;
   progressEl.value = 0;
+  startClock();
   runEl.disabled = true;
   modeInputs.forEach(input => { input.disabled = true; });
   stopEl.disabled = false;
@@ -630,6 +741,7 @@ async function runSeo(): Promise<void> {
     }
   } finally {
     if (report) report.finishedAt = new Date().toISOString();
+    finishClock();
     controller = null;
     runEl.disabled = false;
     modeInputs.forEach(input => { input.disabled = false; });
