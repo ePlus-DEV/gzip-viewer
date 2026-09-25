@@ -10,6 +10,28 @@ const sites = {origin: ''};
 const requestCounts = new Map();
 function hits(pathname) { return requestCounts.get(pathname) ?? 0; }
 const changed = new Date().toISOString();
+/** Detect text colliding with the absolutely positioned icon in the shared input. */
+async function assertIconDoesNotOverlap(page, inputRootSelector, name) {
+  const metrics=await page.locator(inputRootSelector).evaluate(root=>{
+    const icon=root.querySelector('svg');
+    const input=root.querySelector('input');
+    if(!icon || !input)throw new Error('Input or icon not found');
+    const iconRect=icon.getBoundingClientRect();
+    const inputRect=input.getBoundingClientRect();
+    return {
+      iconRight:iconRect.right,
+      textStart:inputRect.left+parseFloat(getComputedStyle(input).paddingLeft),
+      iconHeight:iconRect.height,
+      fieldHeight:inputRect.height,
+      iconY:iconRect.top+iconRect.height/2,
+      fieldY:inputRect.top+inputRect.height/2,
+    };
+  });
+  assert.ok(metrics.textStart >= metrics.iconRight+7,
+    name+': icon overlaps input text ('+JSON.stringify(metrics)+')');
+  assert.ok(Math.abs(metrics.iconY-metrics.fieldY)<=3,
+    name+': icon is not vertically centered ('+JSON.stringify(metrics)+')');
+}
 const product = {
   id: 101, sku: '101', mpn: 'ABC', gtin: '1234567890128',
   title: 'Test item', description: 'Fixture product', brand: 'Example',
@@ -94,6 +116,7 @@ try {
   await popup.setViewportSize({width:460,height:840});
   await popup.goto('chrome-extension://'+id+'/popup.html',{waitUntil:'networkidle'});
   await popup.locator('#site').fill(sites.origin+'/llms.txt');
+  await assertIconDoesNotOverlap(popup,'.popup-site-input','Popup target URL');
   await popup.screenshot({path:'artifacts/popup.png',fullPage:true});
   const newTab=context.waitForEvent('page',{timeout:25000});
   await popup.getByRole('button',{name:/Run AEO Tests/i}).click();
@@ -103,6 +126,8 @@ try {
   page.on('pageerror',error=>exceptions.push(error.stack||error.message));
   page.on('console',message=>{if(message.type()==='error')exceptions.push('console: '+message.text());});
   await page.locator('#run').waitFor({state:'visible'});
+  await assertIconDoesNotOverlap(page,'.audit-site-input','Audit target URL');
+  await assertIconDoesNotOverlap(page,'.results-search','Audit findings search');
   assert.equal(new URL(page.url()).searchParams.get('mode'),'aeo',
     'Popup must open the selected audit mode.');
   assert.equal(new URL(page.url()).searchParams.get('scope'),'quick',
@@ -196,6 +221,47 @@ try {
   assert.ok(seoPass>=3,'SEO must crawl a real XML sitemap and page.');
   console.log('SEO autorun smoke PASS: '+seoPass+' live checks.');
   await seoPage.screenshot({path:'artifacts/seo-results.png',fullPage:true});
+
+  // A deep-linked XML resource has no ancestors, so Back and Home are disabled;
+  // Dashboard must ALWAYS return to the main audit page without a new scan.
+  const viewer=await context.newPage();
+  viewer.on('pageerror',error=>exceptions.push('Viewer: '+(error.stack||error.message)));
+  await viewer.setViewportSize({width:1440,height:1000});
+  const viewerUrl='chrome-extension://'+id+'/viewer.html?url='+
+    encodeURIComponent(sites.origin+'/sitemap.xml');
+  await viewer.goto(viewerUrl,{waitUntil:'networkidle'});
+  assert.equal(await viewer.locator('#home').isDisabled(),true,
+    'The first resource has no ancestor; resource Home may be disabled.');
+  assert.equal(await viewer.locator('#dashboard').isEnabled(),true,
+    'The main Dashboard button must ALWAYS work for a direct resource URL.');
+  await assertIconDoesNotOverlap(viewer,'.viewer-search','Explorer header search');
+  await viewer.screenshot({path:'artifacts/resource-explorer.png',fullPage:true});
+  await viewer.setViewportSize({width:640,height:900});
+  await assertIconDoesNotOverlap(viewer,'.viewer-search','Explorer mobile search');
+  await viewer.screenshot({path:'artifacts/resource-explorer-mobile.png',fullPage:true});
+  await viewer.locator('#dashboard').click();
+  await viewer.waitForURL(url => url.pathname==='/test-runner.html',{timeout:20000});
+  assert.equal(new URL(viewer.url()).searchParams.has('autorun'),false,
+    'Dashboard navigation must open the main screen WITHOUT auto-running.');
+  assert.equal(new URL(viewer.url()).searchParams.get('mode'),'seo',
+    'Return to the selected audit mode, not the wrong one.');
+  assert.equal(await viewer.locator('#site').inputValue(),sites.origin+'/robots.txt',
+    'Preserve the audited website when returning home.');
+  assert.equal(hits('/robots.txt'),1,
+    'Returning to the main dashboard must not launch another scan.');
+  console.log('Explorer smoke PASS: icons align; Dashboard returns to the main screen.');
+
+  // Run Tests from the Explorer is also one-click and uses the selected mode.
+  await viewer.goto(viewerUrl,{waitUntil:'networkidle'});
+  await viewer.locator('#runTests').click();
+  await viewer.waitForURL(url=>url.pathname==='/test-runner.html',{timeout:20000});
+  await viewer.waitForFunction(()=>
+    document.querySelector('#activity')?.textContent?.includes('Finished.'),
+    undefined,{timeout:90000},
+  );
+  assert.equal(hits('/robots.txt'),2,
+    'Run Tests from Explorer must launch exactly one SEO scan.');
+  console.log('Explorer Run Tests smoke PASS: one click launches the selected SEO suite.');
   assert.deepEqual(exceptions,[],'Extension raised unexpected runtime or browser console errors.');
   console.log('Extension smoke passed: one-click AEO/SEO autorun, one-shot refresh protection, and manual rerun.');
 } finally {

@@ -8,6 +8,7 @@ import { responseText } from '../../lib/decompress';
 import { parseLlms, resolveLink, type LlmsDocument, type ResourceLink } from '../../lib/discovery';
 import { parseSitemap, type ParsedSitemap } from '../../lib/sitemap';
 import { childTrail, documentLabel, readTrail, viewerHref as routedHref, type NavItem } from '../../lib/navigation';
+import {dashboardHref} from '../../lib/dashboard-navigation';
 
 type Mode = ReturnType<typeof determineFormat>;
 
@@ -41,6 +42,8 @@ const currentItem: NavItem = {
 };
 const backEl = document.querySelector<HTMLButtonElement>('#back')!;
 const homeEl = document.querySelector<HTMLButtonElement>('#home')!;
+const dashboardEl = document.querySelector<HTMLButtonElement>('#dashboard')!;
+const runTestsEl = document.querySelector<HTMLButtonElement>('#runTests')!;
 const breadcrumbsEl = document.querySelector<HTMLDivElement>('#breadcrumbs')!;
 const treeEl = document.querySelector<HTMLDivElement>('#tree')!;
 let state: ViewerState = {
@@ -119,7 +122,7 @@ function renderTree(): void {
     a.href = ancestorHref(item, i);
     treeEl.append(a);
   });
-  treeEl.append(node('span', '● ' + currentItem.label, 'tree-active'));
+  treeEl.append(node('span', currentItem.label, 'tree-active'));
   if (state.mode === 'llms' && state.llms) {
     state.llms.groups.forEach((group, i) => {
       const a = node('a', group.heading + ' (' + group.links.length + ')', 'tree-section');
@@ -478,7 +481,7 @@ async function load(): Promise<void> {
     return;
   }
 
-  document.title = (url.pathname.split('/').pop() || 'Feed') + ' — GZIP JSONL Viewer';
+  document.title = (url.pathname.split('/').pop() || 'Resource') + ' — SEO & AEO Auditor';
   sourceEl.textContent = 'Source: ' + url.origin + url.pathname;
   itemsEl.replaceChildren();
   metricsEl.replaceChildren();
@@ -530,10 +533,23 @@ limitEl.addEventListener('change', render);
 reloadEl.addEventListener('click', () => { void load(); });
 void load();
 
-document.querySelector<HTMLButtonElement>('#runTests')!.addEventListener('click', () => {
-  if (!rawUrl) return;
-  const url = new URL('/llms.txt', httpUrl(rawUrl).origin);
-  location.assign(browser.runtime.getURL('/test-runner.html') + '?url=' + encodeURIComponent(url.href));
-});
+async function openAuditDashboard(autoRun: boolean): Promise<void> {
+  dashboardEl.disabled = true;
+  runTestsEl.disabled = true;
+  try {
+    const saved = await browser.storage.local.get(['lastUrl', 'auditMode', 'auditScope'])
+      .catch(() => ({}));
+    const destination = dashboardHref(
+      browser.runtime.getURL('/test-runner.html'), rawUrl, trail, saved, autoRun,
+    );
+    location.assign(destination);
+  } finally {
+    // In the event the navigation is blocked, do not leave the controls disabled.
+    dashboardEl.disabled = false;
+    runTestsEl.disabled = false;
+  }
+}
+dashboardEl.addEventListener('click', () => { void openAuditDashboard(false); });
+runTestsEl.addEventListener('click', () => { void openAuditDashboard(true); });
 
 }

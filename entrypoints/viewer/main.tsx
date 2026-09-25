@@ -1,6 +1,6 @@
 import {useEffect} from 'react';
 import {createRoot} from 'react-dom/client';
-import {ArrowLeft, ChevronRight, Compass, House, Layers3, Play, Radar, RotateCw, Search} from 'lucide-react';
+import {ArrowLeft, ChevronRight, Compass, House, LayoutDashboard, Layers3, Play, RotateCw, Search} from 'lucide-react';
 import {Button} from '../../components/beui/button';
 import {AnimatedBadge} from '../../components/beui/animated-badge';
 import {Input} from '../../components/beui/input';
@@ -30,6 +30,10 @@ function Explorer() {
             <option value="5000">5,000 results</option>
             <option value="0">All results</option>
           </select>
+          <Button id="dashboard" variant="outline" className="rounded-lg viewer-action dashboard-link" size="sm"
+            title="Return to the main audit dashboard">
+            <LayoutDashboard size={16}/> Dashboard
+          </Button>
           <Button id="reload" variant="outline" className="rounded-lg viewer-action" size="sm">
             <RotateCw size={15}/> Reload
           </Button>
@@ -42,7 +46,8 @@ function Explorer() {
         <Button id="back" variant="ghost" size="sm" className="rounded-lg" disabled>
           <ArrowLeft size={15}/> Back
         </Button>
-        <Button id="home" variant="ghost" size="sm" className="rounded-lg" disabled>
+        <Button id="home" variant="ghost" size="sm" className="rounded-lg"
+          title="Return to the first resource in this exploration" disabled>
           <House size={15}/> Home
         </Button>
         <span className="breadcrumb-divider"/>

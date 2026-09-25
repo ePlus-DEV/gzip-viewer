@@ -74,3 +74,27 @@ body{margin:0;background:var(--ui-page);color:var(--ui-text);font-size:13px;line
 #summary .metric{border-top:3px solid #477be9}
 #items{border-radius:14px;box-shadow:var(--ui-shadow)}
 @media(max-width:1020px){.viewer-search{max-width:none;flex-basis:100%}}
+
+/* Fixed icon geometry: leftIcon is absolutely positioned by the shared Input component.
+   Legacy .search-field input padding:9px 0 was making the text overlap the icon. */
+.viewer-search .search-field { position:relative;display:block;padding:0;min-width:0; }
+.viewer-search .search-field > input { box-sizing:border-box; width:100%;padding-left:42px;padding-right:14px; }
+.viewer-search .search-field > span:first-child { left:13px;top:50%; }
+.viewer-controls .viewer-action, #navigation button {
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;line-height:1;
+  min-height:36px;white-space:nowrap;
+}
+.viewer-controls .viewer-action > svg, #navigation button > svg {
+  flex:0 0 auto;width:16px;height:16px;display:block;
+}
+.dashboard-link {border-color:color-mix(in srgb,var(--ui-accent) 23%,var(--ui-border));}
+.dashboard-link:hover {background:var(--ui-accent-soft);color:var(--ui-accent);}
+#tree .tree-active {display:flex;align-items:center;gap:9px;line-height:1.5;}
+#tree .tree-active::before {
+  content:"";flex:0 0 auto;display:block;width:6px;height:6px;
+  border-radius:50%;background:var(--ui-accent);
+}
+#navigation #breadcrumbs {align-items:center;line-height:1.5;}
+#navigation #breadcrumbs > svg {flex:0 0 auto;width:15px;height:15px;}
+@media(max-width:1020px){.viewer-controls{align-items:center;flex-wrap:wrap;row-gap:9px;}}
+@media(max-width:600px){.viewer-controls .dashboard-link{order:1}.viewer-controls #runTests{order:1}}
