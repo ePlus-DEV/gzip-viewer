@@ -92,3 +92,7 @@ The extension icon sizes 16, 32, 48 and 128 are generated from `assets/brand-mar
 ## Results and completion
 
 Failed and blocked checks are shown before successful checks, even after hundreds of results. Filter by status or search by SKU, URL and PCL ID. Incomplete runs remain visibly incomplete and never trigger completion notifications.
+
+## One-click audit launch
+
+Choose AEO or SEO, select Quick or Full, enter a site URL, then press **Run Tests** in the popup. The new dashboard now **starts the selected audit automatically**; you do not have to press Run again. An audit opened manually through its dashboard URL or Resource Explorer remains idle until Run is pressed. The launch flag is removed from browser history before execution, so refreshing the completed results page cannot start another potentially expensive scan. **Run** inside the dashboard is still available for explicit reruns.

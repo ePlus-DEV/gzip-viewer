@@ -1,10 +1,11 @@
 import {browser} from 'wxt/browser';
 import {httpUrl} from '../../lib/feed';
-import {selectFindings, type Filter, type FindingLike} from '../../lib/audit-results';
+import {selectFindings, type Filter, type FindingLike, type FindingSort} from '../../lib/audit-results';
 
 export function createFindingList(
   container:HTMLElement,
   filter:HTMLSelectElement,
+  sort:HTMLSelectElement,
   query:HTMLInputElement,
   summary:HTMLElement,
   limit=250,
@@ -13,7 +14,7 @@ export function createFindingList(
   let pending=false;
 
   function rerender():void {
-    const {visible,matched}=selectFindings(source,filter.value as Filter,query.value,limit);
+    const {visible,matched}=selectFindings(source,filter.value as Filter,query.value,limit,sort.value as FindingSort);
     summary.textContent=visible.length===matched
       ? matched+' matching checks'
       : 'Showing '+visible.length+' / '+matched+' checks. Narrow the filter or search to see more.';
@@ -52,6 +53,7 @@ export function createFindingList(
     requestAnimationFrame(()=>{pending=false;rerender();});
   }
   filter.addEventListener('change',rerender);
+  sort.addEventListener('change',rerender);
   query.addEventListener('input',rerender);
   return {schedule,rerender};
 }

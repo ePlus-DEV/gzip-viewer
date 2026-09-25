@@ -7,6 +7,7 @@ import {AUDIT_MODES, type AuditMode} from '../../lib/audit-modes';
 import {runSeoAudit} from './seo';
 import {createFindingList} from './findings';
 import {isAuditComplete} from '../../lib/audit-results';
+import {pendingAutoRun} from '../../lib/audit-launch';
 import {
   buildCompletionNotification, COMPLETION_NOTIFICATION_KEY, COMPLETION_NOTIFICATION_PREFIX,
 } from '../../lib/audit-notifications';
@@ -35,7 +36,7 @@ interface Report {
 export function initializeAuditRunner(): void {
 const required=['site','scope','reference','links','run','stop','export','browse','activity','progress',
   'findings','summary','notification-status','elapsed','remaining','finish-at','duration-label',
-  'remaining-label','finish-label','timing-note','result-filter','result-query','results-visible'];
+  'remaining-label','finish-label','timing-note','result-filter','result-sort','result-query','results-visible'];
 const missing=required.filter(id=>!document.getElementById(id));
 if(missing.length)throw new Error('Audit dashboard missing: '+missing.join(', '));
 if(document.documentElement.dataset.auditRunnerReady==='true')return;
@@ -64,6 +65,7 @@ let displayCount = 0;
 const findingList=createFindingList(
   findingsEl,
   document.querySelector<HTMLSelectElement>('#result-filter')!,
+  document.querySelector<HTMLSelectElement>('#result-sort')!,
   document.querySelector<HTMLInputElement>('#result-query')!,
   document.querySelector<HTMLElement>('#results-visible')!,
 );
@@ -810,17 +812,34 @@ exportEl.addEventListener('click', () => {
   anchor.click();
   setTimeout(() => URL.revokeObjectURL(href), 10000);
 });
-void browser.storage.local.get('lastUrl').then(({lastUrl}) => {
-  const provided = new URLSearchParams(location.search).get('url');
-  // The React input is populated from URL query or stored preference.
-  const initialScope = new URLSearchParams(location.search).get('scope');
-  if (initialScope === 'full' || initialScope === 'quick') scopeEl.value = initialScope;
-  const initialMode = new URLSearchParams(location.search).get('mode');
-  if (initialMode === 'seo') {
-    const seo = modeInputs.find(input => input.value === 'seo');
-    if (seo) seo.checked = true;
-  }
-  renderMode();
-}).catch(()=>renderMode());
+// The popup's Run command is a one-time launch. Manual navigation into the
+// dashboard and page refreshes must NOT silently restart potentially huge scans.
+// The React input already owns and initializes the site URL from the query.
+const params = new URLSearchParams(location.search);
+const scopeFromPopup = params.get('scope');
+if (scopeFromPopup === 'quick' || scopeFromPopup === 'full') {
+  scopeEl.value = scopeFromPopup;
+}
+if (params.get('mode') === 'seo') {
+  const seo = modeInputs.find(input => input.value === 'seo');
+  if (seo) seo.checked = true;
+}
+renderMode();
+
+const autoRun = pendingAutoRun(location.href);
+if (autoRun) {
+  // Consume before starting so F5, reopening a bookmark, or returning to this
+  // tab never duplicates an audit. The user can use Run again manually.
+  window.history.replaceState(window.history.state, '', autoRun.cleanHref);
+  // Invoke the engine itself; synthetic button clicks can be missed while
+  // React/Motion commits the new page's initial UI.
+  activityEl.textContent = 'Starting the selected audit…';
+  if (!controller) void (chosenMode() === 'seo' ? runSeo() : runAeo());
+} else if (params.get('autorun') === '1') {
+  const clean = new URL(location.href);
+  clean.searchParams.delete('autorun');
+  window.history.replaceState(window.history.state, '', clean.href);
+  activityEl.textContent = 'Cannot start automatically: enter a valid HTTP(S) site URL.';
+}
 
 }

@@ -10,6 +10,7 @@ import {Switch} from '../../components/beui/switch';
 import {httpUrl} from '../../lib/feed';
 import type {AuditMode, TestScope} from '../../lib/audit-modes';
 import {COMPLETION_NOTIFICATION_KEY} from '../../lib/audit-notifications';
+import {auditLaunchUrl} from '../../lib/audit-launch';
 import '../../assets/beui.css';
 import './style.css';
 
@@ -60,14 +61,11 @@ function App() {
     setError('');
     try {
       await browser.storage.local.set({lastUrl: parsed.href, auditMode: mode, auditScope: scope});
-      const params = new URLSearchParams();
-      const destination = kind === 'audit' ? '/test-runner.html' : '/viewer.html';
-      params.set('url', kind === 'direct' ? parsed.href : documentUrl);
-      if (kind === 'audit') {
-        params.set('mode', mode);
-        params.set('scope', scope);
-      }
-      await browser.tabs.create({url: browser.runtime.getURL(destination) + '?' + params.toString()});
+      const destination = kind === 'audit'
+        ? auditLaunchUrl(browser.runtime.getURL('/test-runner.html'), parsed.href, mode, scope)
+        : browser.runtime.getURL('/viewer.html') + '?url=' +
+          encodeURIComponent(kind === 'direct' ? parsed.href : documentUrl);
+      await browser.tabs.create({url: destination});
       window.close();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Cannot open the extension tab.');
@@ -82,7 +80,7 @@ function App() {
           <div className="brand-symbol"><img src="/icon-48.png" width={40} height={40} alt=""/></div>
           <div><strong>SEO <span>&amp;</span> AEO Auditor</strong><small>Website quality workspace</small></div>
         </div>
-        <AnimatedBadge status="info" size="sm" showIcon={false}>v1.9</AnimatedBadge>
+        <AnimatedBadge status="info" size="sm" showIcon={false}>v1.9.1</AnimatedBadge>
       </header>
 
       <section className="popup-hero">

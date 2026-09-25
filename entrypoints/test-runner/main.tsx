@@ -98,7 +98,7 @@ function App() {
           <div className="sidebar-info"><ShieldCheck size={17}/>
             <span>Site data is fetched using your current Chrome session. No external uploads.</span>
           </div>
-          <div className="sidebar-credit">SEO &amp; AEO Auditor <span>v1.9</span></div>
+          <div className="sidebar-credit">SEO &amp; AEO Auditor <span>v1.9.1</span></div>
         </aside>
 
         <main className="audit-content">
@@ -236,13 +236,19 @@ function App() {
               <div className="results-toolbar-actions">
                 <label htmlFor="result-filter" className="sr-only">Filter audit results</label>
                 <select id="result-filter" defaultValue="all" aria-label="Result severity">
-                  <option value="all">All · Priority first</option>
+                  <option value="all">All statuses</option>
                   <option value="issues">Issues only</option>
                   <option value="fail">FAIL</option>
                   <option value="warning">WARNING</option>
                   <option value="blocked">BLOCKED</option>
                   <option value="not-run">NOT RUN</option>
                   <option value="pass">PASS</option>
+                </select>
+                <label htmlFor="result-sort" className="sr-only">Sort findings</label>
+                <select id="result-sort" defaultValue="newest" aria-label="Sort findings">
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                  <option value="severity">Failures first</option>
                 </select>
                 <Input id="result-query" type="search" placeholder="Search SKU, URL or test ID"
                   leftIcon={<Search size={16}/>} className="results-search"
