@@ -232,3 +232,11 @@ progress{height:10px;accent-color:#20b89b;border-radius:99px}
 }
 #result-sort:focus-visible{outline:3px solid var(--ui-accent);outline-offset:2px}
 @media(max-width:700px){#result-sort{flex:1;min-width:140px}}
+
+/* Match input padding with the absolute left-icon slots on desktop and mobile. */
+.audit-site-input .url-field,.results-search .results-search-field {position:relative;padding:0;}
+.audit-site-input .url-field > input {padding-left:44px;padding-right:13px;}
+.results-search .results-search-field > input {padding-left:42px;padding-right:13px;}
+.audit-site-input .url-field > span:first-child,.results-search .results-search-field > span:first-child {
+  left:13px;top:50%;
+}

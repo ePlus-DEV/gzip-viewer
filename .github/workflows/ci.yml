@@ -8,14 +8,16 @@ on:
 jobs:
   test-and-build:
     name: Unit, browser smoke and extension build
-    runs-on: ubuntu-latest
+    # Pin OS for predictable Chromium smoke tests across ubuntu-latest migration.
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
         with:
           node-version: '22'
+          package-manager-cache: false
       - run: npm install --no-audit --no-fund
       - name: TypeScript gate
         run: npm run typecheck
@@ -27,19 +29,19 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Browser smoke — real AEO and SEO Run Tests
         run: npm run test:smoke
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7.0.1
         if: always()
         with:
           name: audit-dashboard-preview
           path: artifacts/*.png
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7.0.1
         if: failure()
         with:
           name: debug-unverified-chrome
           path: .output/chrome-mv3/
           if-no-files-found: ignore
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7.0.1
         if: success()
         with:
           name: seo-aeo-auditor-chrome

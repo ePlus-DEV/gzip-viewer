@@ -98,3 +98,8 @@ body{background:#f3f7fe;}
 .advanced-trigger{height:30px;margin:9px 0 0}
 .advanced-actions button{font-size:10px;padding:5px}
 @media(prefers-color-scheme:dark){body{background:#0b1426}.mode-option{background:#15243a}.mode-option.selected{background:#1b3150}.popup-site-input .website-field{background:#16263e}.popup-notification-setting{background:#14243b}}
+
+/* Shared Input reserves its left icon slot. Avoid reset padding from legacy fields. */
+.popup-site-input .website-field {position:relative;padding:0;}
+.popup-site-input .website-field > input {padding-left:44px;padding-right:13px;}
+.popup-site-input .website-field > span:first-child {left:13px;top:50%;}

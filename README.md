@@ -96,3 +96,9 @@ Failed and blocked checks are shown before successful checks, even after hundred
 ## One-click audit launch
 
 Choose AEO or SEO, select Quick or Full, enter a site URL, then press **Run Tests** in the popup. The new dashboard now **starts the selected audit automatically**; you do not have to press Run again. An audit opened manually through its dashboard URL or Resource Explorer remains idle until Run is pressed. The launch flag is removed from browser history before execution, so refreshing the completed results page cannot start another potentially expensive scan. **Run** inside the dashboard is still available for explicit reruns.
+
+## Explorer navigation and icon alignment
+
+The Resource Explorer has two separate navigation concepts: **Back / Home** move through the current document ancestry, while the always-available **Dashboard** button returns to the full-page audit setup. Dashboard preserves the selected AEO/SEO mode, test scope and original website where possible; it does not automatically launch an audit. **Run Tests** in the explorer is one-click and explicitly starts the selected audit. Opening a sitemap directly (with no ancestry) still allows navigation to the Dashboard.
+
+Shared input icons in the popup, audit dashboard, live-results search and Resource Explorer have reserved horizontal padding and consistent vertical centering at desktop/mobile widths. The Chromium smoke suite verifies actual rendered icon/text bounding boxes and end-to-end navigation, including direct sitemap links.
