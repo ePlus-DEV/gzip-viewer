@@ -1,9 +1,17 @@
 import {describe, expect, it} from 'vitest';
-import {auditLaunchUrl, pendingAutoRun} from '../lib/audit-launch';
+import {auditEntryUrl, auditLaunchUrl, pendingAutoRun} from '../lib/audit-launch';
 
 const runner = 'chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/test-runner.html';
 
 describe('one-click popup audit launch', () => {
+  it('normalizes page/feed URLs to the exact entry point displayed by the runner', () => {
+    expect(auditEntryUrl('https://example.com/feeds/products.json', 'aeo'))
+      .toBe('https://example.com/llms.txt');
+    expect(auditEntryUrl('https://example.com/en/products/123.json', 'seo'))
+      .toBe('https://example.com/robots.txt');
+    expect(auditEntryUrl('http://localhost:8080/de/product/1', 'aeo'))
+      .toBe('http://localhost:8080/llms.txt');
+  });
   it('starts AEO from llms and carries the selected scan scope', () => {
     const url = auditLaunchUrl(runner, 'https://example.com/products/123', 'aeo', 'full');
     const params = new URL(url).searchParams;
