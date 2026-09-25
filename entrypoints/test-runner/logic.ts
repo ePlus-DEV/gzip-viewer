@@ -5,6 +5,9 @@ import {parseSitemap} from '../../lib/sitemap';
 import {responseText} from '../../lib/decompress';
 import {AUDIT_MODES, type AuditMode} from '../../lib/audit-modes';
 import {runSeoAudit} from './seo';
+import {
+  buildCompletionNotification, COMPLETION_NOTIFICATION_KEY, COMPLETION_NOTIFICATION_PREFIX,
+} from '../../lib/audit-notifications';
 import {estimateStageRemainingMs, formatDuration, stageFromMessage, type AuditStage} from '../../lib/audit-timing';
 import {
   type AuditFinding, type ShardData, type ShardRecord,
@@ -43,6 +46,7 @@ const activityEl = document.querySelector<HTMLElement>('#activity')!;
 const progressEl = document.querySelector<HTMLProgressElement>('#progress')!;
 const findingsEl = document.querySelector<HTMLElement>('#findings')!;
 const summaryEl = document.querySelector<HTMLElement>('#summary')!;
+const notificationStatusEl = document.querySelector<HTMLElement>('#notification-status')!;
 let controller: AbortController | null = null;
 let report: Report | null = null;
 let displayCount = 0;
@@ -152,6 +156,34 @@ function finishClock(): void {
   clockStage = null;
 }
 
+
+
+async function notifyWhenFinished(completedReport: Report): Promise<void> {
+  const details = buildCompletionNotification(completedReport);
+  if (!details) return; // Stop and unexpected runtime errors never trigger success notifications.
+  try {
+    // Read the preference at completion, so users can switch it OFF mid-run.
+    const preference = await browser.storage.local.get(COMPLETION_NOTIFICATION_KEY);
+    if (preference[COMPLETION_NOTIFICATION_KEY] !== true) return;
+    const tab = await browser.tabs.getCurrent();
+    const notificationId = COMPLETION_NOTIFICATION_PREFIX +
+      (tab?.id ?? 0) + '-' + Date.now();
+    await browser.notifications.create(notificationId, {
+      type: 'basic',
+      iconUrl: browser.runtime.getURL('/notification-icon.png'),
+      title: details.title,
+      message: details.message,
+    });
+    if (report === completedReport) {
+      notificationStatusEl.textContent = 'Desktop notification sent. Select it to return to this report.';
+    }
+  } catch {
+    if (report === completedReport) {
+      notificationStatusEl.textContent =
+        'Could not display a desktop notification. Check Chrome and operating-system notification settings.';
+    }
+  }
+}
 
 function finding(id: string, level: AuditFinding['level'], summary: string,
   detail?: string, url?: string): void {
@@ -440,6 +472,7 @@ async function runAeo(): Promise<void> {
   displayCount = 0;
   progressEl.value = 0;
   startClock();
+  notificationStatusEl.textContent = '';
   runEl.disabled = true;
   modeInputs.forEach(input => { input.disabled = true; });
   stopEl.disabled = false;
@@ -690,6 +723,7 @@ async function runAeo(): Promise<void> {
   } finally {
     if (report) report.finishedAt = new Date().toISOString();
     finishClock();
+    if (report) void notifyWhenFinished(report);
     controller = null;
     runEl.disabled = false;
     modeInputs.forEach(input => { input.disabled = false; });
@@ -715,6 +749,7 @@ async function runSeo(): Promise<void> {
   displayCount = 0;
   progressEl.value = 0;
   startClock();
+  notificationStatusEl.textContent = '';
   runEl.disabled = true;
   modeInputs.forEach(input => { input.disabled = true; });
   stopEl.disabled = false;
@@ -742,6 +777,7 @@ async function runSeo(): Promise<void> {
   } finally {
     if (report) report.finishedAt = new Date().toISOString();
     finishClock();
+    if (report) void notifyWhenFinished(report);
     controller = null;
     runEl.disabled = false;
     modeInputs.forEach(input => { input.disabled = false; });

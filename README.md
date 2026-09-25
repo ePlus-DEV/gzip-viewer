@@ -76,3 +76,9 @@ Source URLs are entered by the user. No staging URL, secret or credentials are c
 The live audit dashboard shows **elapsed wall-clock time**, **approximate remaining time**, and **expected finish** while tests are running. An estimate appears only after at least two comparable shard groups (AEO) or page checks (SEO); discovery and sitemap size cannot be reliably predicted in advance. The estimate concerns the current processing stage and may change when network latency or shard size varies. Once the run completes or is stopped, the dashboard displays **actual total runtime** and the local finish time. Exported JSON includes `startedAt`, `finishedAt` and `durationMs`.
 
 A floating **Back to top** control appears in both the audit dashboard and Resource Explorer after scrolling down. It respects `prefers-reduced-motion` and remains keyboard accessible.
+
+## Optional completion notifications
+
+Switch **Notify when finished** ON or OFF from the popup or the audit dashboard. The preference is saved in local browser storage, is **OFF by default**, and is checked again when each run finishes; you may disable it during an ongoing scan. Completed AEO/SEO audits report the actual PASS/FAIL/WARNING/NOT RUN totals and elapsed time in a Chrome desktop notification, including audits with failed test cases. Manually stopped or unexpectedly interrupted runs do not send completion notifications.
+
+Select the notification to return to the audit's results tab. The built-in 128px PNG icon is packaged with the extension and no third-party service receives results. Chrome and the operating system must allow notifications; extension/OS blocking can prevent delivery. Like the rest of the in-page runner, the audit tab must remain open until the scan finishes.

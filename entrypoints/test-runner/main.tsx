@@ -1,15 +1,48 @@
-import {useEffect} from 'react';
+import {useEffect, useState} from 'react';
+import {browser} from 'wxt/browser';
 import {createRoot} from 'react-dom/client';
 import {Activity, ArrowUpRight, Bot, CheckCircle2, Download, FileCode2,
-  Globe2, Layers2, Play, Radar, Search, ShieldCheck, Square, Sparkles} from 'lucide-react';
+  Globe2, Layers2, Play, Radar, Search, ShieldCheck, Square, Sparkles,
+  BellRing, Clock3, Hourglass, CalendarClock} from 'lucide-react';
 import {Button} from '../../components/beui/button';
 import {AnimatedBadge} from '../../components/beui/animated-badge';
 import {initializeAuditRunner} from './logic';
+import {COMPLETION_NOTIFICATION_KEY} from '../../lib/audit-notifications';
+import {BackToTop} from '../../components/BackToTop';
 import '../../assets/beui.css';
 import './style.css';
 
 function App() {
+  const [notifyOnComplete, setNotifyOnComplete] = useState(false);
+  const [preferenceError, setPreferenceError] = useState('');
   useEffect(() => { initializeAuditRunner(); }, []);
+  useEffect(() => {
+    let alive = true;
+    const sync = (changes: Record<string, {newValue?: unknown}>, area: string) => {
+      if (alive && area === 'local' && changes[COMPLETION_NOTIFICATION_KEY]) {
+        setNotifyOnComplete(changes[COMPLETION_NOTIFICATION_KEY]!.newValue === true);
+      }
+    };
+    browser.storage.onChanged.addListener(sync);
+    void browser.storage.local.get(COMPLETION_NOTIFICATION_KEY).then(stored => {
+      if (alive) setNotifyOnComplete(stored[COMPLETION_NOTIFICATION_KEY] === true);
+    }).catch(() => {
+      if (alive) setPreferenceError('Cannot read notification preferences.');
+    });
+    return () => {
+      alive = false;
+      browser.storage.onChanged.removeListener(sync);
+    };
+  }, []);
+  async function changeNotifications(enabled: boolean) {
+    try {
+      await browser.storage.local.set({[COMPLETION_NOTIFICATION_KEY]: enabled});
+      setNotifyOnComplete(enabled);
+      setPreferenceError('');
+    } catch {
+      setPreferenceError('Could not save the notification setting. Please try again.');
+    }
+  }
   return (
     <div className="audit-shell">
       <header className="audit-header">
@@ -35,7 +68,7 @@ function App() {
           <div className="sidebar-info"><ShieldCheck size={17}/>
             <span>Site data is fetched using your current Chrome session. No external uploads.</span>
           </div>
-          <div className="sidebar-credit">SEO &amp; AEO Auditor <span>v1.7</span></div>
+          <div className="sidebar-credit">SEO &amp; AEO Auditor <span>v1.8</span></div>
         </aside>
 
         <main className="audit-content">
@@ -115,6 +148,22 @@ function App() {
                 <Download size={16}/> Export JSON
               </Button>
             </div>
+            <div className="notification-setting">
+              <span className="notification-setting-icon"><BellRing size={19}/></span>
+              <span className="notification-setting-copy">
+                <strong>Notify when audit finishes</strong>
+                <small>Optional desktop notification, even when the tab is in the background.</small>
+              </span>
+              <label className="notification-switch">
+                <input type="checkbox" role="switch" aria-label="Notify me when the audit finishes"
+                  checked={notifyOnComplete}
+                  onChange={event => { void changeNotifications(event.target.checked); }}/>
+                <span className="notification-switch-track" aria-hidden="true"><span/></span>
+                <strong>{notifyOnComplete ? 'On' : 'Off'}</strong>
+              </label>
+            </div>
+            {preferenceError && <p className="notification-setting-error" role="alert">{preferenceError}</p>}
+            <p id="notification-status" className="notification-delivery-status" role="status" aria-live="polite"/>
             <p className="audit-note"><ShieldCheck size={15}/>
               Full AEO may download large feeds. Full SEO checks up to 500 page URLs and reports skipped coverage as NOT RUN.</p>
           </section>
@@ -127,6 +176,21 @@ function App() {
             </div>
             <progress id="progress" max="100" value="0"/>
             <p id="activity">Ready. Choose a mode and press Run Tests.</p>
+            <div className="time-metrics" role="group" aria-label="Audit timing">
+              <div className="time-metric">
+                <span className="time-caption"><Clock3 size={16}/><span id="duration-label">Time elapsed</span></span>
+                <strong id="elapsed" className="time-value">00:00:00</strong>
+              </div>
+              <div className="time-metric">
+                <span className="time-caption"><Hourglass size={16}/><span id="remaining-label">Estimated remaining</span></span>
+                <strong id="remaining" className="time-value">Not started</strong>
+              </div>
+              <div className="time-metric">
+                <span className="time-caption"><CalendarClock size={16}/><span id="finish-label">Expected finish</span></span>
+                <strong id="finish-at" className="time-value">—</strong>
+              </div>
+            </div>
+            <p id="timing-note" className="timing-note">ETA appears after two comparable units.</p>
             <div className="totals">
               <div className="stat passed"><strong id="passed">0</strong><span>PASS</span></div>
               <div className="stat failed"><strong id="failed">0</strong><span>FAIL</span></div>
@@ -138,6 +202,7 @@ function App() {
           </section>
         </main>
       </div>
+      <BackToTop/>
     </div>
   );
 }
