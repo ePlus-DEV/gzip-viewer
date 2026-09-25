@@ -5,6 +5,8 @@ import {parseSitemap} from '../../lib/sitemap';
 import {responseText} from '../../lib/decompress';
 import {AUDIT_MODES, type AuditMode} from '../../lib/audit-modes';
 import {runSeoAudit} from './seo';
+import {createFindingList} from './findings';
+import {isAuditComplete} from '../../lib/audit-results';
 import {
   buildCompletionNotification, COMPLETION_NOTIFICATION_KEY, COMPLETION_NOTIFICATION_PREFIX,
 } from '../../lib/audit-notifications';
@@ -28,8 +30,16 @@ interface Report {
   sampledProducts: number;
   checkedLinks: number;
   stopped: boolean;
+  completed: boolean;
 }
 export function initializeAuditRunner(): void {
+const required=['site','scope','reference','links','run','stop','export','browse','activity','progress',
+  'findings','summary','notification-status','elapsed','remaining','finish-at','duration-label',
+  'remaining-label','finish-label','timing-note','result-filter','result-query','results-visible'];
+const missing=required.filter(id=>!document.getElementById(id));
+if(missing.length)throw new Error('Audit dashboard missing: '+missing.join(', '));
+if(document.documentElement.dataset.auditRunnerReady==='true')return;
+document.documentElement.dataset.auditRunnerReady='true';
 const modeInputs = Array.from(document.querySelectorAll<HTMLInputElement>('input[name="audit-mode"]'));
 const modeDescriptionEl = document.querySelector<HTMLElement>('#mode-description')!;
 const modeChecksEl = document.querySelector<HTMLUListElement>('#mode-checks')!;
@@ -46,11 +56,17 @@ const activityEl = document.querySelector<HTMLElement>('#activity')!;
 const progressEl = document.querySelector<HTMLProgressElement>('#progress')!;
 const findingsEl = document.querySelector<HTMLElement>('#findings')!;
 const summaryEl = document.querySelector<HTMLElement>('#summary')!;
+const sidebarBrowseEl=document.querySelector<HTMLAnchorElement>('#sidebar-browse');
 const notificationStatusEl = document.querySelector<HTMLElement>('#notification-status')!;
 let controller: AbortController | null = null;
 let report: Report | null = null;
 let displayCount = 0;
-const MAX_VISIBLE = 500;
+const findingList=createFindingList(
+  findingsEl,
+  document.querySelector<HTMLSelectElement>('#result-filter')!,
+  document.querySelector<HTMLInputElement>('#result-query')!,
+  document.querySelector<HTMLElement>('#results-visible')!,
+);
 
 // Wall-clock duration continues to be accurate if Chrome throttles background tabs.
 // ETA is deliberately stage-specific: sitemap/page/shard work is not uniform.
@@ -160,7 +176,7 @@ function finishClock(): void {
 
 async function notifyWhenFinished(completedReport: Report): Promise<void> {
   const details = buildCompletionNotification(completedReport);
-  if (!details) return; // Stop and unexpected runtime errors never trigger success notifications.
+  if (!details || !completedReport.completed) return; // Never report partial work as completed.
   try {
     // Read the preference at completion, so users can switch it OFF mid-run.
     const preference = await browser.storage.local.get(COMPLETION_NOTIFICATION_KEY);
@@ -185,6 +201,12 @@ async function notifyWhenFinished(completedReport: Report): Promise<void> {
   }
 }
 
+function emitRunState():void{
+  window.dispatchEvent(new CustomEvent('audit:run-state',{
+    detail:{running:controller!==null,hasReport:report!==null},
+  }));
+}
+
 function finding(id: string, level: AuditFinding['level'], summary: string,
   detail?: string, url?: string): void {
   if (!report) return;
@@ -192,41 +214,7 @@ function finding(id: string, level: AuditFinding['level'], summary: string,
   if (detail) entry.detail = detail.slice(0, 2000);
   if (url) entry.url = url;
   report.findings.push(entry);
-  if (displayCount < MAX_VISIBLE) {
-    const line = document.createElement('div');
-    line.className = 'test';
-    const title = document.createElement('div');
-    title.className = 'headline';
-    const label = document.createElement('span');
-    label.className = 'status ' + level;
-    label.textContent = level.toUpperCase();
-    const code = document.createElement('span');
-    code.className = 'id';
-    code.textContent = id;
-    const message = document.createElement('strong');
-    message.textContent = summary;
-    title.append(label, code, message);
-    line.append(title);
-    if (detail) {
-      const desc = document.createElement('span');
-      desc.className = 'detail';
-      desc.textContent = detail.slice(0, 700);
-      line.append(desc);
-    }
-    if (url) {
-      try {
-        const remote = httpUrl(url);
-        const link = document.createElement('a');
-        link.href = browser.runtime.getURL('/viewer.html') + '?url=' + encodeURIComponent(remote.href);
-        link.textContent = 'Inspect URL ↗';
-        link.target = '_blank';
-        link.rel = 'noopener';
-        line.append(link);
-      } catch { /* Ignore invalid diagnostic URLs. */ }
-    }
-    findingsEl.append(line);
-    displayCount++;
-  }
+  findingList.schedule(report.findings);
   refresh();
 }
 
@@ -452,6 +440,7 @@ function renderMode(): void {
   } catch {
     browseEl.href = browser.runtime.getURL('/viewer.html');
   }
+  if(sidebarBrowseEl) sidebarBrowseEl.href=browseEl.href;
 }
 
 async function runAeo(): Promise<void> {
@@ -466,14 +455,15 @@ async function runAeo(): Promise<void> {
   report = {
     mode: 'aeo', plannedChecks: [...AUDIT_MODES.aeo.checks],
     startedAt: new Date().toISOString(), origin: entered.origin, scope,
-    findings: [], checkedShards: 0, sampledProducts: 0, checkedLinks: 0, stopped: false,
+    findings: [], checkedShards: 0, sampledProducts: 0, checkedLinks: 0, stopped: false, completed: false,
   };
   findingsEl.replaceChildren();
-  displayCount = 0;
+  findingList.schedule([]);
   progressEl.value = 0;
   startClock();
   notificationStatusEl.textContent = '';
   runEl.disabled = true;
+  emitRunState();
   modeInputs.forEach(input => { input.disabled = true; });
   stopEl.disabled = false;
   exportEl.disabled = true;
@@ -710,6 +700,7 @@ async function runAeo(): Promise<void> {
       'This runner is not a full execution of every requirement/PCL in the external workbook.',
       'It covers the linked-feed test groups shown in the result list.');
     step('5/5 · Finished. Review results or export report.', 100);
+    report!.completed=true;
   } catch (error) {
     if (controller?.signal.aborted) {
       finding('RUN-STOPPED', 'blocked', 'Testing stopped by user. Partial results are preserved.');
@@ -721,11 +712,18 @@ async function runAeo(): Promise<void> {
       step('Run interrupted. Review the error and export results.', progressEl.value);
     }
   } finally {
-    if (report) report.finishedAt = new Date().toISOString();
+    if(report&&!report.completed&&!report.stopped&&
+       !report.findings.some(f=>/(?:^|-)RUN-ERROR$/.test(f.id))){
+      finding('RUN-INCOMPLETE','blocked','Audit did not finish all stages.',
+        'Check prerequisites, network access and blocked checks before retrying.');
+      step('Audit incomplete · Review blocked checks and retry.',progressEl.value);
+    }
+    if(report)report.finishedAt=new Date().toISOString();
     finishClock();
-    if (report) void notifyWhenFinished(report);
+    if(report?.completed)void notifyWhenFinished(report);
     controller = null;
     runEl.disabled = false;
+    emitRunState();
     modeInputs.forEach(input => { input.disabled = false; });
     stopEl.disabled = true;
     exportEl.disabled = !report;
@@ -743,14 +741,15 @@ async function runSeo(): Promise<void> {
   report = {
     mode: 'seo', plannedChecks: [...AUDIT_MODES.seo.checks],
     startedAt: new Date().toISOString(), origin: entered.origin, scope,
-    findings: [], checkedShards: 0, sampledProducts: 0, checkedLinks: 0, stopped: false,
+    findings: [], checkedShards: 0, sampledProducts: 0, checkedLinks: 0, stopped: false, completed: false,
   };
   findingsEl.replaceChildren();
-  displayCount = 0;
+  findingList.schedule([]);
   progressEl.value = 0;
   startClock();
   notificationStatusEl.textContent = '';
   runEl.disabled = true;
+  emitRunState();
   modeInputs.forEach(input => { input.disabled = true; });
   stopEl.disabled = false;
   exportEl.disabled = true;
@@ -764,6 +763,7 @@ async function runSeo(): Promise<void> {
       fetchPage: fetchResponse, report: finding, redirectOK: checkRedirect,
       progress: step, assertActive, linkChecked: () => { if (report) report.checkedLinks++; },
     });
+    report!.completed=isAuditComplete(progressEl.value,report!.stopped,report!.findings);
   } catch (error) {
     if (controller?.signal.aborted) {
       finding('SEO-RUN-STOPPED', 'blocked',
@@ -775,11 +775,18 @@ async function runSeo(): Promise<void> {
         error instanceof Error ? error.message : String(error));
     }
   } finally {
-    if (report) report.finishedAt = new Date().toISOString();
+    if(report&&!report.completed&&!report.stopped&&
+       !report.findings.some(f=>/(?:^|-)RUN-ERROR$/.test(f.id))){
+      finding('RUN-INCOMPLETE','blocked','Audit did not finish all stages.',
+        'Check prerequisites, network access and blocked checks before retrying.');
+      step('Audit incomplete · Review blocked checks and retry.',progressEl.value);
+    }
+    if(report)report.finishedAt=new Date().toISOString();
     finishClock();
-    if (report) void notifyWhenFinished(report);
+    if(report?.completed)void notifyWhenFinished(report);
     controller = null;
     runEl.disabled = false;
+    emitRunState();
     modeInputs.forEach(input => { input.disabled = false; });
     stopEl.disabled = true;
     exportEl.disabled = !report;
@@ -805,8 +812,7 @@ exportEl.addEventListener('click', () => {
 });
 void browser.storage.local.get('lastUrl').then(({lastUrl}) => {
   const provided = new URLSearchParams(location.search).get('url');
-  if (provided) siteEl.value = provided;
-  else if (typeof lastUrl === 'string') siteEl.value = lastUrl;
+  // The React input is populated from URL query or stored preference.
   const initialScope = new URLSearchParams(location.search).get('scope');
   if (initialScope === 'full' || initialScope === 'quick') scopeEl.value = initialScope;
   const initialMode = new URLSearchParams(location.search).get('mode');
@@ -815,6 +821,6 @@ void browser.storage.local.get('lastUrl').then(({lastUrl}) => {
     if (seo) seo.checked = true;
   }
   renderMode();
-});
+}).catch(()=>renderMode());
 
 }

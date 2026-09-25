@@ -4,6 +4,8 @@
 
 @theme inline {
   --color-primary: var(--ui-accent);
+  --color-background: var(--ui-panel);
+  --color-success: var(--ui-success);
   --color-primary-foreground: #ffffff;
   --color-foreground: var(--ui-text);
   --color-muted-foreground: var(--ui-subtle);

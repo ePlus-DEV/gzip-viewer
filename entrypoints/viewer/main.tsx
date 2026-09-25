@@ -3,6 +3,7 @@ import {createRoot} from 'react-dom/client';
 import {ArrowLeft, ChevronRight, Compass, House, Layers3, Play, Radar, RotateCw, Search} from 'lucide-react';
 import {Button} from '../../components/beui/button';
 import {AnimatedBadge} from '../../components/beui/animated-badge';
+import {Input} from '../../components/beui/input';
 import {initializeViewer} from './logic';
 import {BackToTop} from '../../components/BackToTop';
 import '../../assets/beui.css';
@@ -14,14 +15,14 @@ function Explorer() {
     <div className="viewer-shell">
       <header className="viewer-header">
         <div className="viewer-brand">
-          <span className="viewer-logo"><Radar size={21}/></span>
+          <span className="viewer-logo"><img src="/icon-48.png" alt="" width={38} height={38}/></span>
           <span><strong>SEO <em>&amp;</em> AEO Auditor</strong><small>Resource Explorer</small></span>
           <AnimatedBadge status="neutral" size="sm" showIcon={false}>Browse</AnimatedBadge>
         </div>
         <div className="viewer-controls">
-          <div className="search-field"><Search size={17}/>
-            <input id="search" type="search" placeholder="Search records, URLs or shards…" aria-label="Search resources"/>
-          </div>
+          <Input id="search" type="search" placeholder="Search records, URLs or shards…"
+            aria-label="Search resources" leftIcon={<Search size={17}/>}
+            className="viewer-search" classNames={{field:"search-field",input:"viewer-search-input"}}/>
           <select id="limit" aria-label="Result display limit" defaultValue="500">
             <option value="100">100 results</option>
             <option value="500">500 results</option>
@@ -58,7 +59,7 @@ function Explorer() {
         <div id="content">
           <div className="document-head">
             <div><div className="section-kicker">RESOURCE INSPECTOR</div>
-              <h1>Document details <span id="mode"/></h1>
+              <h1>Resource inspector <span id="mode"/></h1>
             </div>
           </div>
           <div id="source"/>

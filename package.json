@@ -1,16 +1,19 @@
 {
   "name": "gzip-jsonl-viewer",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "private": true,
   "type": "module",
   "description": "WXT Chrome extension with real beUI React/Motion components for AEO/SEO auditing",
   "scripts": {
-    "postinstall": "wxt prepare",
+    "postinstall": "wxt prepare && node scripts/generate-icons.mjs",
     "dev": "wxt",
     "build": "wxt build -b chrome",
     "zip": "wxt zip -b chrome",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:smoke": "node scripts/smoke-extension.mjs",
+    "prebuild": "node scripts/generate-icons.mjs",
+    "prezip": "node scripts/generate-icons.mjs"
   },
   "devDependencies": {
     "wxt": "0.21.4",
@@ -21,7 +24,9 @@
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "tailwindcss": "^4.1.0",
-    "@tailwindcss/vite": "^4.1.0"
+    "@tailwindcss/vite": "^4.1.0",
+    "sharp": "^0.34.5",
+    "playwright": "^1.55.0"
   },
   "dependencies": {
     "react": "^19.1.0",
