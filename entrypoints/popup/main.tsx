@@ -2,11 +2,12 @@ import {useEffect, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {browser} from 'wxt/browser';
 import {ArrowRight, ArrowUpRight, Bot, CheckCircle2, ChevronDown, Database, FileJson2,
-  Globe2, History, Layers2, Play, Radar, Search, ShieldCheck, Sparkles} from 'lucide-react';
+  Globe2, History, Layers2, Play, Radar, Search, ShieldCheck, Sparkles, BellRing} from 'lucide-react';
 import {Button} from '../../components/beui/button';
 import {AnimatedBadge} from '../../components/beui/animated-badge';
 import {httpUrl} from '../../lib/feed';
 import type {AuditMode, TestScope} from '../../lib/audit-modes';
+import {COMPLETION_NOTIFICATION_KEY} from '../../lib/audit-notifications';
 import '../../assets/beui.css';
 import './style.css';
 
@@ -18,11 +19,12 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [advanced, setAdvanced] = useState(false);
+  const [notifyOnComplete, setNotifyOnComplete] = useState(false);
 
   useEffect(() => {
     let alive = true;
     void Promise.all([
-      browser.storage.local.get(['lastUrl','auditMode','auditScope']),
+      browser.storage.local.get(['lastUrl','auditMode','auditScope',COMPLETION_NOTIFICATION_KEY]),
       browser.tabs.query({active: true, currentWindow: true}),
     ]).then(([saved, tabs]) => {
       if (!alive) return;
@@ -32,9 +34,20 @@ function App() {
       if (typeof saved.lastUrl === 'string') setLastUrl(saved.lastUrl);
       if (saved.auditMode === 'aeo' || saved.auditMode === 'seo') setMode(saved.auditMode);
       if (saved.auditScope === 'quick' || saved.auditScope === 'full') setScope(saved.auditScope);
+      setNotifyOnComplete(saved[COMPLETION_NOTIFICATION_KEY] === true);
     }).catch(() => { if (alive) setError('Unable to read saved preferences. Enter a URL to continue.'); });
     return () => { alive = false; };
   }, []);
+
+  async function changeNotifications(enabled: boolean) {
+    try {
+      await browser.storage.local.set({[COMPLETION_NOTIFICATION_KEY]: enabled});
+      setNotifyOnComplete(enabled);
+      setError('');
+    } catch {
+      setError('Could not save the notification setting.');
+    }
+  }
 
   async function open(kind: 'audit'|'explore'|'direct', saved?: string) {
     let parsed: URL;
@@ -67,7 +80,7 @@ function App() {
           <div className="brand-symbol"><Radar size={21} strokeWidth={2.2}/></div>
           <div><strong>SEO <span>&amp;</span> AEO Auditor</strong><small>Website quality workspace</small></div>
         </div>
-        <AnimatedBadge status="info" size="sm" showIcon={false}>v1.7</AnimatedBadge>
+        <AnimatedBadge status="info" size="sm" showIcon={false}>v1.8</AnimatedBadge>
       </header>
 
       <section className="popup-hero">
@@ -124,6 +137,18 @@ function App() {
           ? 'Representative links and product samples for a fast review.'
           : 'Deep discovery with explicit coverage limits and NOT RUN reporting.'}</p>
       </section>
+
+      <label className="popup-notification-setting">
+        <span className="popup-notification-icon"><BellRing size={17}/></span>
+        <span className="popup-notification-copy">
+          <strong>Notify when finished</strong>
+          <small>Show a desktop alert with the audit results</small>
+        </span>
+        <input type="checkbox" role="switch" checked={notifyOnComplete}
+          aria-label="Notify me when the audit finishes"
+          onChange={event => { void changeNotifications(event.target.checked); }}/>
+        <span className="popup-notification-track" aria-hidden="true"><span/></span>
+      </label>
 
       {error && <p role="alert" className="popup-error">{error}</p>}
       <div className="popup-actions">

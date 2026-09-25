@@ -112,3 +112,35 @@ progress{width:100%;height:9px;border-radius:99px;accent-color:var(--ui-accent)}
   .time-metrics { grid-template-columns: 1fr; }
   .time-metric { padding: 12px; }
 }
+
+/* Optional, opt-in desktop completion notifications. */
+.notification-setting {
+  display:flex;align-items:center;gap:12px;margin-top:17px;padding:13px 15px;
+  border:1px solid var(--ui-border);border-radius:11px;background:var(--ui-muted);
+}
+.notification-setting-icon {
+  display:grid;place-items:center;flex-shrink:0;width:36px;height:36px;
+  border-radius:10px;color:var(--ui-accent);background:var(--ui-accent-soft);
+}
+.notification-setting-copy {display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
+.notification-setting-copy strong {font-size:12px;font-weight:750}
+.notification-setting-copy small {font-size:10px;color:var(--ui-subtle);line-height:1.45}
+.notification-switch {display:inline-flex;align-items:center;gap:9px;cursor:pointer}
+.notification-switch input {position:absolute;width:1px;height:1px;opacity:0}
+.notification-switch-track {
+  display:flex;align-items:center;padding:3px;width:40px;height:23px;
+  border-radius:99px;background:var(--ui-border);transition:background .18s ease;
+}
+.notification-switch-track span {
+  display:block;width:17px;height:17px;border-radius:50%;background:white;
+  box-shadow:0 1px 4px #0002;transition:transform .18s ease;
+}
+.notification-switch input:checked + .notification-switch-track {background:var(--ui-accent)}
+.notification-switch input:checked + .notification-switch-track span {transform:translateX(17px)}
+.notification-switch input:focus-visible + .notification-switch-track {
+  outline:3px solid var(--ui-accent);outline-offset:3px;
+}
+.notification-switch strong {font-size:11px;min-width:19px;color:var(--ui-text)}
+.notification-setting-error {margin:7px 0;color:var(--ui-error);font-size:11px}
+.notification-delivery-status:not(:empty) {margin:9px 1px 0;color:var(--ui-subtle);font-size:11px}
+@media(max-width:590px) {.notification-setting{flex-wrap:wrap}.notification-switch{margin-left:auto}}
