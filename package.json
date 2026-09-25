@@ -1,6 +1,6 @@
 {
   "name": "gzip-jsonl-viewer",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "private": true,
   "type": "module",
   "description": "WXT Chrome extension with real beUI React/Motion components for AEO/SEO auditing",
