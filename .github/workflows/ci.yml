@@ -23,6 +23,8 @@ jobs:
         run: npm test
       - name: Build Chrome extension
         run: npm run build
+      - name: Install Chromium for browser smoke
+        run: npx playwright install --with-deps chromium
       - name: Browser smoke — real AEO and SEO Run Tests
         run: npm run test:smoke
       - uses: actions/upload-artifact@v4

@@ -1,14 +1,14 @@
-# SEO & AEO Auditor — beUI Redesign
+# SEO & AEO Auditor
 
-Chrome extension built with [WXT](https://wxt.dev/) (Manifest V3), React 19, Tailwind CSS 4 and actual MIT-licensed [beUI components](https://github.com/starc007/ui-components). Start from llms.txt, follow discovery links like a sitemap, inspect feed indexes, decompress GZIP shards, and open individual product JSON without saving an archive to Downloads.
+Chrome extension built with [WXT](https://wxt.dev/) (Manifest V3), React and Tailwind CSS. The interface uses locally bundled, MIT-licensed UI components (see `THIRD_PARTY_LICENSES.md`). Start from llms.txt, follow discovery links like a sitemap, inspect feed indexes, decompress GZIP shards, and open individual product JSON without saving an archive to Downloads.
 
-## beUI interface
+## Interface
 
-This branch gives all three extension surfaces a unified, responsive beUI workspace while preserving the existing AEO and SEO test engine:
+This branch gives all three extension surfaces a unified, responsive audit workspace while preserving the existing AEO and SEO test engine:
 
-- **Popup:** React + actual beUI animated badges and motion buttons. Choose AEO/SEO, Quick/Full, inspect the current tab or enter an arbitrary HTTP(S) origin; open Run Tests or Resource Explorer.
-- **Test runner:** A responsive React dashboard using beUI Button and AnimatedBadge components. The existing DOM-based live audit engine is initialized after React mounts; its selectors and report format are preserved.
-- **Resource explorer:** A beUI React shell with working Back, Home, search, display limit, Reload and Run Tests; retain all existing LLMS, XML, JSON and GZIP inspection logic.
+- **Popup:** animated controls and compact mode selection. Choose AEO/SEO, Quick/Full, inspect the current tab or enter an arbitrary HTTP(S) origin; open Run Tests or Resource Explorer.
+- **Test runner:** a responsive React dashboard. The existing DOM-based live audit engine is initialized after React mounts; its selectors and report format are preserved.
+- **Resource explorer:** a responsive React shell with working Back, Home, search, display limit, Reload and Run Tests; retain all existing LLMS, XML, JSON and GZIP inspection logic.
 - Respect system dark mode and reduced-motion settings; avoid shipping font binaries or remote CSS/JS.
 
 The MIT-licensed upstream sources are vendored under `components/beui/` (attribution and original license: `THIRD_PARTY_LICENSES.md`). Source paths are made local to work inside WXT without external runtime dependencies.
@@ -39,7 +39,7 @@ No private or staging URL is hard-coded in the source. GZIP responses are decode
 - `entrypoints/popup/`: beUI React popup (mode/scope selection and Run Tests).
 - `entrypoints/viewer/`: beUI React resource-explorer shell and unchanged URL-driven document logic.
 - `entrypoints/test-runner/`: beUI React dashboard plus existing AEO and SEO live test engines.
-- `assets/beui.css`: Tailwind theme tokens and locally bundled beUI styles.
+- `assets/beui.css`: shared Tailwind design tokens and locally bundled styles.
 - `components/beui/`: vendored upstream beUI motion buttons, badges, number, hooks and tokens.
 - `lib/feed.ts`: feed-index metadata validation, product warnings, JSONL parsing and URL derivation.
 - `lib/discovery.ts`: parse llms.txt links and resolve URL templates.
@@ -82,3 +82,13 @@ A floating **Back to top** control appears in both the audit dashboard and Resou
 Switch **Notify when finished** ON or OFF from the popup or the audit dashboard. The preference is saved in local browser storage, is **OFF by default**, and is checked again when each run finishes; you may disable it during an ongoing scan. Completed AEO/SEO audits report the actual PASS/FAIL/WARNING/NOT RUN totals and elapsed time in a Chrome desktop notification, including audits with failed test cases. Manually stopped or unexpectedly interrupted runs do not send completion notifications.
 
 Select the notification to return to the audit's results tab. The built-in 128px PNG icon is packaged with the extension and no third-party service receives results. Chrome and the operating system must allow notifications; extension/OS blocking can prevent delivery. Like the rest of the in-page runner, the audit tab must remain open until the scan finishes.
+
+## Regression gates and extension icons
+
+Every PR executes TypeScript validation, the full Vitest suite, a production WXT build and a **real Chromium browser smoke test** that loads the extension, presses the AEO and SEO Run Tests buttons and checks local HTTP fixtures. Do not merge while a check is failing. Repeat with `npm install`, `npm run typecheck`, `npm test`, `npm run build` and `npm run test:smoke` (first install Chromium with `npx playwright install chromium`).
+
+The extension icon sizes 16, 32, 48 and 128 are generated from `assets/brand-mark.svg` during install and before production build. The manifest and three interfaces share the same identity.
+
+## Results and completion
+
+Failed and blocked checks are shown before successful checks, even after hundreds of results. Filter by status or search by SKU, URL and PCL ID. Incomplete runs remain visibly incomplete and never trigger completion notifications.

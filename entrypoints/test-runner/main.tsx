@@ -6,6 +6,8 @@ import {Activity, ArrowUpRight, Bot, CheckCircle2, Download, FileCode2,
   BellRing, Clock3, Hourglass, CalendarClock} from 'lucide-react';
 import {Button} from '../../components/beui/button';
 import {AnimatedBadge} from '../../components/beui/animated-badge';
+import {Input} from '../../components/beui/input';
+import {Switch} from '../../components/beui/switch';
 import {initializeAuditRunner} from './logic';
 import {COMPLETION_NOTIFICATION_KEY} from '../../lib/audit-notifications';
 import {BackToTop} from '../../components/BackToTop';
@@ -15,7 +17,35 @@ import './style.css';
 function App() {
   const [notifyOnComplete, setNotifyOnComplete] = useState(false);
   const [preferenceError, setPreferenceError] = useState('');
-  useEffect(() => { initializeAuditRunner(); }, []);
+  const initialSite = new URLSearchParams(location.search).get('url') || '';
+  const [site, setSite] = useState(initialSite);
+  const [startupError, setStartupError] = useState('');
+  const [runState,setRunState] = useState({running:false,hasReport:false});
+  useEffect(()=>{
+    const handler=(event:Event)=> {
+      const update=(event as CustomEvent<{running:boolean;hasReport:boolean}>).detail;
+      if(update) setRunState(update);
+    };
+    window.addEventListener('audit:run-state',handler);
+    return ()=>window.removeEventListener('audit:run-state',handler);
+  },[]);
+  useEffect(() => {
+    try {initializeAuditRunner();}
+    catch (reason) {
+      const details=reason instanceof Error?reason.message:String(reason);
+      setStartupError('Unable to initialize the audit: '+details);
+    }
+  }, []);
+  useEffect(() => {
+    if(initialSite)return;
+    let alive=true;
+    void browser.storage.local.get('lastUrl').then(result=>{
+      if(alive&&typeof result.lastUrl==='string') {
+        setSite(current=>current||(result.lastUrl as string));
+      }
+    }).catch(()=>{});
+    return ()=>{alive=false;};
+  }, [initialSite]);
   useEffect(() => {
     let alive = true;
     const sync = (changes: Record<string, {newValue?: unknown}>, area: string) => {
@@ -46,11 +76,11 @@ function App() {
   return (
     <div className="audit-shell">
       <header className="audit-header">
-        <div className="audit-logo"><span className="logo-mark"><Radar size={22}/></span>
+        <div className="audit-logo"><span className="logo-mark"><img src="/icon-48.png" width={39} height={39} alt=""/></span>
           <span><strong>SEO <em>&amp;</em> AEO Auditor</strong><small>Website quality workspace</small></span>
         </div>
         <div className="audit-header-actions">
-          <AnimatedBadge status="info" size="sm" showIcon={false}>beUI powered</AnimatedBadge>
+          <AnimatedBadge status="info" size="sm" showIcon={false}>LOCAL AUDIT</AnimatedBadge>
           <a id="browse" className="explore-nav" href="#" aria-label="Open resource explorer in the extension">
             <Layers2 size={16}/> Resource Explorer <ArrowUpRight size={14}/>
           </a>
@@ -60,27 +90,28 @@ function App() {
       <div className="audit-layout">
         <aside className="audit-sidebar">
           <div className="sidebar-title">WORKSPACE</div>
-          <div className="sidebar-active"><Activity size={16}/> Audit dashboard</div>
-          <div className="sidebar-feature"><Globe2 size={16}/> Website resources</div>
+          <a className="sidebar-active" href="#audit-config"><Activity size={16}/> Audit dashboard</a>
+          <a className="sidebar-feature" id="sidebar-browse" href="#audit-config"><Globe2 size={16}/> Website resources</a>
           <div className="sidebar-divider"/>
           <div className="sidebar-title">ABOUT THIS AUDIT</div>
           <p>Every check includes a result, a reference and a path back to its source.</p>
           <div className="sidebar-info"><ShieldCheck size={17}/>
             <span>Site data is fetched using your current Chrome session. No external uploads.</span>
           </div>
-          <div className="sidebar-credit">SEO &amp; AEO Auditor <span>v1.8</span></div>
+          <div className="sidebar-credit">SEO &amp; AEO Auditor <span>v1.9</span></div>
         </aside>
 
         <main className="audit-content">
           <div className="page-eyebrow"><Sparkles size={14}/> AUDIT WORKSPACE</div>
           <div className="page-head">
-            <div><h1>Website audit</h1>
-              <p>Choose an audit mode, set your scope and run live checks right in Chrome.</p>
+            <div><h1>Site intelligence <span className="hero-accent">workspace.</span></h1>
+              <p>Explore crawlability and AI discovery, compare product feeds, and isolate data issues.</p>
             </div>
-            <AnimatedBadge status="success" size="md">Ready to audit</AnimatedBadge>
+            <AnimatedBadge status="info" size="md">AUDIT CONSOLE</AnimatedBadge>
           </div>
 
-          <section className="panel configuration-panel" aria-labelledby="mode-heading">
+          {startupError && <div className="startup-error" role="alert">{startupError}</div>}
+          <section className="panel configuration-panel" id="audit-config" aria-labelledby="mode-heading">
             <div className="panel-heading"><div className="heading-icon"><Bot size={19}/></div>
               <div><h2 id="mode-heading">Choose an audit</h2><p>Two specialized suites, one reporting workspace.</p></div>
               <span className="step-count">STEP 01</span>
@@ -114,9 +145,10 @@ function App() {
               <span className="step-count">STEP 02</span>
             </div>
             <label htmlFor="site" className="input-label">Website URL</label>
-            <div className="url-field"><Globe2 size={17}/>
-              <input id="site" type="url" placeholder="https://example.com" autoComplete="url" required/>
-            </div>
+            <Input id="site" type="url" value={site} onChange={setSite}
+              autoComplete="url" placeholder="https://example.com"
+              leftIcon={<Globe2 size={17}/>} className="audit-site-input"
+              classNames={{field:"url-field",input:"audit-site-text"}} required/>
             <div className="settings">
               <label htmlFor="scope">Scan scope
                 <select id="scope">
@@ -140,11 +172,11 @@ function App() {
               <ul id="mode-checks"/>
             </details>
             <div className="run-toolbar">
-              <Button id="run" size="lg" className="rounded-xl audit-run"><Play size={16} fill="currentColor"/> Run Tests</Button>
-              <Button id="stop" variant="outline" size="lg" className="rounded-xl" disabled>
+              <Button id="run" size="lg" disabled={runState.running} className="rounded-xl audit-run"><Play size={16} fill="currentColor"/> Run Tests</Button>
+              <Button id="stop" variant="outline" size="lg" className="rounded-xl" disabled={!runState.running}>
                 <Square size={15}/> Stop
               </Button>
-              <Button id="export" variant="outline" size="lg" className="rounded-xl" disabled>
+              <Button id="export" variant="outline" size="lg" className="rounded-xl" disabled={!runState.hasReport || runState.running}>
                 <Download size={16}/> Export JSON
               </Button>
             </div>
@@ -154,13 +186,11 @@ function App() {
                 <strong>Notify when audit finishes</strong>
                 <small>Optional desktop notification, even when the tab is in the background.</small>
               </span>
-              <label className="notification-switch">
-                <input type="checkbox" role="switch" aria-label="Notify me when the audit finishes"
-                  checked={notifyOnComplete}
-                  onChange={event => { void changeNotifications(event.target.checked); }}/>
-                <span className="notification-switch-track" aria-hidden="true"><span/></span>
+              <div className="notification-switch">
+                <Switch checked={notifyOnComplete} ariaLabel="Notify me when the audit finishes"
+                  onCheckedChange={enabled=>{void changeNotifications(enabled);}}/>
                 <strong>{notifyOnComplete ? 'On' : 'Off'}</strong>
-              </label>
+              </div>
             </div>
             {preferenceError && <p className="notification-setting-error" role="alert">{preferenceError}</p>}
             <p id="notification-status" className="notification-delivery-status" role="status" aria-live="polite"/>
@@ -197,6 +227,27 @@ function App() {
               <div className="stat warnings"><strong id="warnings">0</strong><span>WARNING</span></div>
               <div className="stat blocked"><strong id="blocked">0</strong><span>BLOCKED</span></div>
               <div className="stat notrun"><strong id="notrun">0</strong><span>NOT RUN</span></div>
+            </div>
+            <div className="results-toolbar">
+              <div className="results-toolbar-heading">
+                <strong>Live findings</strong>
+                <span id="results-visible">0 matching checks</span>
+              </div>
+              <div className="results-toolbar-actions">
+                <label htmlFor="result-filter" className="sr-only">Filter audit results</label>
+                <select id="result-filter" defaultValue="all" aria-label="Result severity">
+                  <option value="all">All · Priority first</option>
+                  <option value="issues">Issues only</option>
+                  <option value="fail">FAIL</option>
+                  <option value="warning">WARNING</option>
+                  <option value="blocked">BLOCKED</option>
+                  <option value="not-run">NOT RUN</option>
+                  <option value="pass">PASS</option>
+                </select>
+                <Input id="result-query" type="search" placeholder="Search SKU, URL or test ID"
+                  leftIcon={<Search size={16}/>} className="results-search"
+                  classNames={{field:"results-search-field",input:"results-search-text"}}/>
+              </div>
             </div>
             <div id="findings" className="findings"/>
           </section>
