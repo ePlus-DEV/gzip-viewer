@@ -88,6 +88,7 @@ try {
   assert.match(id,/^[a-p]{32}$/);
   await mkdir('artifacts',{recursive:true});
   const exceptions=[];
+  context.on('page',tab=>tab.on('pageerror',error=>exceptions.push('early: '+(error.stack||error.message))));
   const popup=await context.newPage();
   popup.on('pageerror',error=>exceptions.push('popup: '+(error.stack||error.message)));
   await popup.setViewportSize({width:460,height:840});
@@ -123,6 +124,9 @@ try {
       runEnabled:await page.locator('#run').isEnabled(),
       counts:{llms:hits('/llms.txt'),robots:hits('/robots.txt')},
       pageErrors:exceptions,
+      launchTrace:await page.evaluate(()=>sessionStorage.getItem('audit-launch-trace')),
+      startupError:await page.locator('.startup-error').allInnerTexts(),
+      timing:await page.locator('#elapsed').innerText(),
     }));
     await page.screenshot({path:'artifacts/autorun-debug.png',fullPage:true});
     throw error;
