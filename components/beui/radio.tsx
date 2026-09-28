@@ -87,6 +87,7 @@ export interface RadioGroupItemProps {
   disabled?: boolean;
   className?: string;
   id?: string;
+  ariaLabel?: string;
 }
 
 export function RadioGroupItem({
@@ -95,6 +96,7 @@ export function RadioGroupItem({
   disabled,
   className,
   id: idProp,
+  ariaLabel,
 }: RadioGroupItemProps) {
   const { value: groupValue, setValue, layoutId } = useRadioGroup();
   const autoId = useId();
@@ -115,6 +117,7 @@ export function RadioGroupItem({
         id={id}
         type="button"
         role="radio"
+        aria-label={ariaLabel}
         aria-checked={selected}
         disabled={disabled}
         onClick={() => !disabled && setValue(value)}
