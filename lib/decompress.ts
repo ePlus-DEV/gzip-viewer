@@ -32,13 +32,14 @@ export async function streamTextLines(
   response:Response,
   onLine:(line:string,lineNumber:number)=>void|Promise<void>,
 ):Promise<number>{
-  const reader=decodedStream(response).pipeThrough(new TextDecoderStream()).getReader();
+  const reader=decodedStream(response).getReader();
+  const decoder=new TextDecoder();
   let pending='',lineNumber=0;
   try{
     while(true){
       const {value,done}=await reader.read();
       if(done)break;
-      pending+=value;
+      pending+=decoder.decode(value,{stream:true});
       let newline:number;
       while((newline=pending.indexOf('\n'))>=0){
         let line=pending.slice(0,newline);
@@ -49,6 +50,7 @@ export async function streamTextLines(
         if(lineNumber%1000===0) await new Promise<void>(resolve=>setTimeout(resolve,0));
       }
     }
+    pending+=decoder.decode();
     if(pending){
       lineNumber++;
       await onLine(pending.endsWith('\r')?pending.slice(0,-1):pending,lineNumber);
