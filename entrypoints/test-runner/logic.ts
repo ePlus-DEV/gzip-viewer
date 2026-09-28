@@ -66,7 +66,7 @@ const activityEl = document.querySelector<HTMLElement>('#activity')!;
 const progressEl = document.querySelector<HTMLProgressElement>('#progress')!;
 const findingsEl = document.querySelector<HTMLElement>('#findings')!;
 const summaryEl = document.querySelector<HTMLElement>('#summary')!;
-const sidebarBrowseEl=document.querySelector<HTMLAnchorElement>('#sidebar-browse');
+const sidebarBrowseEl=document.querySelector<HTMLAnchorElement>('#sidebar-browse-slot a');
 const notificationStatusEl = document.querySelector<HTMLElement>('#notification-status')!;
 let activeValidationConfig: AuditValidationConfig = DEFAULT_AUDIT_CONFIG;
 let hasLiveValidationConfig=false;
@@ -458,9 +458,6 @@ function renderMode(): void {
     li.textContent = check;
     modeChecksEl.append(li);
   });
-  document.querySelectorAll('.mode-card').forEach(card =>
-    card.classList.toggle('selected',
-      card.querySelector<HTMLInputElement>('input')?.checked === true));
   document.querySelectorAll('.aeo-only').forEach(element =>
     element.classList.toggle('hidden', mode === 'seo'));
   document.querySelectorAll('.seo-only').forEach(element =>
@@ -1026,10 +1023,14 @@ const params = new URLSearchParams(location.search);
 const scopeFromPopup = params.get('scope');
 if (scopeFromPopup === 'quick' || scopeFromPopup === 'full') {
   scopeEl.value = scopeFromPopup;
+  scopeEl.dispatchEvent(new Event('change',{bubbles:true}));
 }
 if (params.get('mode') === 'seo') {
   const seo = modeInputs.find(input => input.value === 'seo');
-  if (seo) seo.checked = true;
+  if (seo) {
+    seo.checked = true;
+    seo.dispatchEvent(new Event('change',{bubbles:true}));
+  }
 }
 renderMode();
 

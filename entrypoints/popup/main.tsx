@@ -96,7 +96,7 @@ function App() {
           <div className="brand-symbol"><img src="/icon-48.png" width={40} height={40} alt=""/></div>
           <div><strong>SEO <span>&amp;</span> AEO Auditor</strong><small>Website quality workspace</small></div>
         </div>
-        <AnimatedBadge status="info" size="sm" showIcon={false}>v1.11.0</AnimatedBadge>
+        <AnimatedBadge status="info" size="sm" showIcon={false}>v1.12.0</AnimatedBadge>
       </header>
 
       <section className="popup-hero">

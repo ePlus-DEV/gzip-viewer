@@ -1,4 +1,7 @@
 import { browser } from 'wxt/browser';
+import {createElement} from 'react';
+import {createRoot, type Root} from 'react-dom/client';
+import {ResourceTemplateForm} from '../../components/ResourceTemplateForm';
 import {
   auditFeedIndex, determineFormat, httpUrl, isRecord, parseJsonLines,
   productIssues, productJsonUrl,
@@ -15,6 +18,10 @@ import {
 } from '../../lib/parts-compatibility';
 
 type Mode = ReturnType<typeof determineFormat>;
+const dynamicRoots: Root[] = [];
+function clearDynamicRoots(): void {
+  while (dynamicRoots.length) dynamicRoots.pop()?.unmount();
+}
 
 interface ViewerState {
   mode: Mode | null;
@@ -492,51 +499,16 @@ function renderLlms(): void {
       row.append(title, node('span', link.url, 'resource-url'));
 
       if (link.placeholders.length) {
-        const form = node('form', undefined, 'resource-form');
-        const fields = new Map<string, HTMLInputElement | HTMLSelectElement>();
-        for (const placeholder of link.placeholders) {
-          const wrapper = node('label', placeholder.toUpperCase());
-          let field: HTMLInputElement | HTMLSelectElement;
-          if (placeholder === 'lang' && llms.languages.length) {
-            const select = node('select');
-            for (const language of llms.languages) {
-              const option = node('option', language);
-              option.value = language;
-              select.append(option);
-            }
-            field = select;
-          } else {
-            const input = node('input');
-            input.type = 'text';
-            input.required = true;
-            input.maxLength = 180;
-            input.placeholder = placeholder === 'sku' ? 'Product SKU'
-              : placeholder === 'shard' ? 'Number from feed index' : placeholder;
-            if (placeholder === 'lang') input.value = 'en';
-            field = input;
-          }
-          field.name = placeholder;
-          fields.set(placeholder, field);
-          wrapper.append(field);
-          form.append(wrapper);
-        }
-        const submit = node('button', 'Resolve & view');
-        submit.type = 'submit';
-        form.append(submit);
-        const warning = node('small', '', 'error');
-        form.append(warning);
-        form.addEventListener('submit', event => {
-          event.preventDefault();
-          const values: Record<string, string> = {};
-          fields.forEach((field, key) => { values[key] = field.value; });
-          const destination = resolveLink(link, rawUrl!, values);
-          if (!destination) {
-            warning.textContent = 'Fill in every template variable with a valid value.';
-            return;
-          }
-          location.assign(viewerLink(destination, link.label));
-        });
-        row.append(form);
+        const host=node('div',undefined,'resource-template-host');
+        const root=createRoot(host);
+        dynamicRoots.push(root);
+        root.render(createElement(ResourceTemplateForm,{
+          placeholders:link.placeholders,
+          languages:llms.languages,
+          onResolve:(values:Record<string,string>)=>resolveLink(link,rawUrl!,values),
+          onNavigate:(destination:string)=>location.assign(viewerLink(destination,link.label)),
+        }));
+        row.append(host);
         if (link.placeholders.includes('shard')) {
           row.append(node('small', 'Find actual shard numbers in the product feed index; do not guess.'));
         }
@@ -617,6 +589,7 @@ function renderText(): void {
 }
 
 function render(): void {
+  clearDynamicRoots();
   modeEl.textContent = state.mode ? state.mode.toUpperCase() : '';
   renderTree();
   if (state.mode === 'llms') return renderLlms();

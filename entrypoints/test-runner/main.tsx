@@ -1,13 +1,25 @@
 import {useEffect, useState} from 'react';
 import {browser} from 'wxt/browser';
 import {createRoot} from 'react-dom/client';
-import {Activity, ArrowUpRight, Bot, CheckCircle2, Download, FileCode2,
-  Globe2, Layers2, Play, Radar, Search, ShieldCheck, Square, Sparkles,
-  BellRing, Clock3, Hourglass, CalendarClock, SlidersHorizontal, RotateCcw} from 'lucide-react';
+import {Activity, ArrowUpRight, Bot, Download, FileCode2,
+  Globe2, Layers2, Play, Search, ShieldCheck, Square, Sparkles,
+  BellRing, Clock3, Hourglass, CalendarClock, SlidersHorizontal, RotateCcw,
+  PanelLeft, X} from 'lucide-react';
 import {Button} from '../../components/beui/button';
 import {AnimatedBadge} from '../../components/beui/animated-badge';
 import {Input} from '../../components/beui/input';
 import {Switch} from '../../components/beui/switch';
+import {
+  AnimatedSidebar, AnimatedSidebarContent, AnimatedSidebarFooter,
+  AnimatedSidebarGroup, AnimatedSidebarGroupContent, AnimatedSidebarGroupLabel,
+  AnimatedSidebarInset, AnimatedSidebarMenu, AnimatedSidebarMenuButton,
+  AnimatedSidebarMenuItem, AnimatedSidebarProvider, AnimatedSidebarRail,
+  AnimatedSidebarTrigger,
+} from '../../components/beui/animated-sidebar';
+import {LegacyBoundSelect, SelectField} from '../../components/SelectField';
+import {RadioGroup, RadioGroupItem} from '../../components/beui/radio';
+import {BouncyAccordion} from '../../components/beui/bouncy-accordion';
+import {Drawer} from '../../components/beui/drawer';
 import {initializeAuditRunner} from './logic';
 import {COMPLETION_NOTIFICATION_KEY} from '../../lib/audit-notifications';
 import {
@@ -21,13 +33,17 @@ import './style.css';
 function App() {
   const [notifyOnComplete, setNotifyOnComplete] = useState(false);
   const [preferenceError, setPreferenceError] = useState('');
-  const initialSite = new URLSearchParams(location.search).get('url') || '';
+  const params = new URLSearchParams(location.search);
+  const initialSite = params.get('url') || '';
+  const initialMode = params.get('mode') === 'seo' ? 'seo' : 'aeo';
   const [site, setSite] = useState(initialSite);
+  const [auditModeUi,setAuditModeUi] = useState<'aeo'|'seo'>(initialMode);
   const [startupError, setStartupError] = useState('');
   const [runState,setRunState] = useState({running:false,hasReport:false});
   const [validationConfig,setValidationConfig] = useState<AuditValidationConfig>(DEFAULT_AUDIT_CONFIG);
   const [expectedLanguagesText,setExpectedLanguagesText] = useState('');
   const [validationError,setValidationError] = useState('');
+  const [validationOpen,setValidationOpen] = useState(false);
   useEffect(()=>{
     const handler=(event:Event)=> {
       const update=(event as CustomEvent<{running:boolean;hasReport:boolean}>).detail;
@@ -70,6 +86,28 @@ function App() {
   function resetValidationConfig(){
     setExpectedLanguagesText('');
     saveValidationConfig(DEFAULT_AUDIT_CONFIG);
+  }
+  useEffect(()=>{
+    const radios=Array.from(document.querySelectorAll<HTMLInputElement>(
+      '.beui-native-radio-bridge input[name="audit-mode"]',
+    ));
+    const sync=()=>{
+      const checked=radios.find(input=>input.checked)?.value;
+      if(checked==='aeo'||checked==='seo')setAuditModeUi(checked);
+    };
+    radios.forEach(input=>input.addEventListener('change',sync));
+    sync();
+    return ()=>radios.forEach(input=>input.removeEventListener('change',sync));
+  },[]);
+  function changeAuditMode(next:'aeo'|'seo'){
+    setAuditModeUi(next);
+    const input=document.querySelector<HTMLInputElement>(
+      '.beui-native-radio-bridge input[name="audit-mode"][value="'+next+'"]',
+    );
+    if(input){
+      input.checked=true;
+      input.dispatchEvent(new Event('change',{bubbles:true}));
+    }
   }
   useEffect(() => {
     try {initializeAuditRunner();}
@@ -129,21 +167,49 @@ function App() {
         </div>
       </header>
 
-      <div className="audit-layout">
-        <aside className="audit-sidebar">
-          <div className="sidebar-title">WORKSPACE</div>
-          <a className="sidebar-active" href="#audit-config"><Activity size={16}/> Audit dashboard</a>
-          <a className="sidebar-feature" id="sidebar-browse" href="#audit-config"><Globe2 size={16}/> Website resources</a>
-          <div className="sidebar-divider"/>
-          <div className="sidebar-title">ABOUT THIS AUDIT</div>
-          <p>Every check includes a result, a reference and a path back to its source.</p>
-          <div className="sidebar-info"><ShieldCheck size={17}/>
-            <span>Site data is fetched using your current Chrome session. No external uploads.</span>
-          </div>
-          <div className="sidebar-credit">SEO &amp; AEO Auditor <span>v1.11.0</span></div>
-        </aside>
+      <AnimatedSidebarProvider className="audit-layout">
+        <AnimatedSidebar ariaLabel="Audit workspace" collapsible="icon"
+          className="audit-beui-sidebar" panelClassName="audit-sidebar-panel">
+          <AnimatedSidebarContent className="audit-sidebar-content">
+            <AnimatedSidebarGroup>
+              <AnimatedSidebarGroupLabel>Workspace</AnimatedSidebarGroupLabel>
+              <AnimatedSidebarGroupContent>
+                <AnimatedSidebarMenu>
+                  <AnimatedSidebarMenuItem>
+                    <AnimatedSidebarMenuButton href="#audit-config" isActive
+                      icon={<Activity size={17}/>}>Audit dashboard</AnimatedSidebarMenuButton>
+                  </AnimatedSidebarMenuItem>
+                  <AnimatedSidebarMenuItem>
+                    <span id="sidebar-browse-slot">
+                      <AnimatedSidebarMenuButton href="#audit-config"
+                        icon={<Globe2 size={17}/>}>Website resources</AnimatedSidebarMenuButton>
+                    </span>
+                  </AnimatedSidebarMenuItem>
+                </AnimatedSidebarMenu>
+              </AnimatedSidebarGroupContent>
+            </AnimatedSidebarGroup>
+            <AnimatedSidebarGroup className="sidebar-about-group">
+              <AnimatedSidebarGroupLabel>About this audit</AnimatedSidebarGroupLabel>
+              <AnimatedSidebarGroupContent className="sidebar-about-copy">
+                <p>Every check includes a result, a reference and a path back to its source.</p>
+                <div className="sidebar-info"><ShieldCheck size={17}/>
+                  <span>Site data is fetched using your current Chrome session. No external uploads.</span>
+                </div>
+              </AnimatedSidebarGroupContent>
+            </AnimatedSidebarGroup>
+          </AnimatedSidebarContent>
+          <AnimatedSidebarFooter className="audit-sidebar-footer">
+            <span className="sidebar-version-mark">SA</span>
+            <span className="sidebar-version-copy">SEO &amp; AEO Auditor <small>v1.12.0</small></span>
+          </AnimatedSidebarFooter>
+          <AnimatedSidebarRail/>
+        </AnimatedSidebar>
 
-        <main className="audit-content">
+        <AnimatedSidebarInset className="audit-content audit-inset">
+          <div className="workspace-mobile-trigger">
+            <AnimatedSidebarTrigger aria-label="Open workspace navigation"><PanelLeft size={16}/></AnimatedSidebarTrigger>
+            <span>Workspace</span>
+          </div>
           <div className="page-eyebrow"><Sparkles size={14}/> AUDIT WORKSPACE</div>
           <div className="page-head">
             <div><h1>Site intelligence <span className="hero-accent">workspace.</span></h1>
@@ -158,27 +224,31 @@ function App() {
               <div><h2 id="mode-heading">Choose an audit</h2><p>Two specialized suites, one reporting workspace.</p></div>
               <span className="step-count">STEP 01</span>
             </div>
-            <fieldset id="audit-modes" className="mode-cards">
-              <legend className="sr-only">Audit mode</legend>
-              <label className="mode-card selected">
-                <input type="radio" name="audit-mode" value="aeo" defaultChecked/>
-                <span className="card-icon aeo"><Bot size={21}/></span>
-                <span className="mode-desc"><strong>AEO Audit</strong>
-                  <small>LLMS, agent instructions, product feed and multilingual data</small>
-                  <span className="mode-tags">llms.txt · agents.md · JSONL.GZ</span>
-                </span>
-                <span className="mode-check"><CheckCircle2 size={18}/></span>
-              </label>
-              <label className="mode-card">
-                <input type="radio" name="audit-mode" value="seo"/>
-                <span className="card-icon seo"><Search size={21}/></span>
-                <span className="mode-desc"><strong>SEO Audit</strong>
-                  <small>Technical indexing, sitemap health and product metadata</small>
-                  <span className="mode-tags">robots.txt · XML · JSON-LD</span>
-                </span>
-                <span className="mode-check"><CheckCircle2 size={18}/></span>
-              </label>
-            </fieldset>
+            <div id="audit-modes">
+              <div className="beui-native-radio-bridge" aria-hidden="true">
+                <input type="radio" name="audit-mode" value="aeo" defaultChecked={initialMode==='aeo'} tabIndex={-1}/>
+                <input type="radio" name="audit-mode" value="seo" defaultChecked={initialMode==='seo'} tabIndex={-1}/>
+              </div>
+              <RadioGroup value={auditModeUi} onValueChange={value=>changeAuditMode(value as 'aeo'|'seo')}
+                orientation="horizontal" className="mode-cards">
+                <RadioGroupItem value="aeo" ariaLabel="AEO Audit" className="mode-card"
+                  label={<>
+                    <span className="card-icon aeo"><Bot size={21}/></span>
+                    <span className="mode-desc"><strong>AEO Audit</strong>
+                      <small>LLMS, agent instructions, product feed and multilingual data</small>
+                      <span className="mode-tags">llms.txt · agents.md · JSONL.GZ</span>
+                    </span>
+                  </>}/>
+                <RadioGroupItem value="seo" ariaLabel="SEO Audit" className="mode-card"
+                  label={<>
+                    <span className="card-icon seo"><Search size={21}/></span>
+                    <span className="mode-desc"><strong>SEO Audit</strong>
+                      <small>Technical indexing, sitemap health and product metadata</small>
+                      <span className="mode-tags">robots.txt · XML · JSON-LD</span>
+                    </span>
+                  </>}/>
+              </RadioGroup>
+            </div>
             <p id="mode-description" className="mode-description">Start at llms.txt and cross-check linked feeds and localized products.</p>
 
             <div className="form-divider"/>
@@ -192,32 +262,49 @@ function App() {
               leftIcon={<Globe2 size={17}/>} className="audit-site-input"
               classNames={{field:"url-field",input:"audit-site-text"}} required/>
             <div className="settings">
-              <label htmlFor="scope">Scan scope
-                <select id="scope">
-                  <option value="quick">⚡ Quick — representative sample</option>
-                  <option value="full">◈ Full — published resources (safety caps)</option>
-                </select>
-              </label>
-              <label htmlFor="reference" className="aeo-only">Reference language
-                <select id="reference"><option value="en">en (default)</option></select>
-              </label>
-              <label htmlFor="links" className="aeo-only">Links from llms.txt
-                <select id="links">
-                  <option value="15">First 15 links</option>
-                  <option value="50">First 50 links</option>
-                  <option value="0">All published links</option>
-                </select>
-              </label>
+              <LegacyBoundSelect id="scope" label="Scan scope" defaultValue="quick"
+                options={[
+                  {value:'quick',label:'⚡ Quick — representative sample'},
+                  {value:'full',label:'◈ Full — published resources (safety caps)'},
+                ]}/>
+              <LegacyBoundSelect id="reference" label="Reference language" defaultValue="en"
+                className="aeo-only" options={[{value:'en',label:'en (default)'}]}/>
+              <LegacyBoundSelect id="links" label="Links from llms.txt" defaultValue="15"
+                className="aeo-only" options={[
+                  {value:'15',label:'First 15 links'},
+                  {value:'50',label:'First 50 links'},
+                  {value:'0',label:'All published links'},
+                ]}/>
             </div>
-            <details className="checklist"><summary><FileCode2 size={16}/>
-              Checks in <span id="checklist-mode">AEO</span> mode</summary>
-              <ul id="mode-checks"/>
-            </details>
-            <details className="validation-config">
-              <summary><SlidersHorizontal size={16}/>
-                <span><strong>Validation settings</strong><small>Saved locally and included in exported reports.</small></span>
-              </summary>
-              <div className="validation-config-body">
+            <BouncyAccordion
+              items={[{
+                id:'checks',
+                icon:<FileCode2 size={16}/>,
+                title:<span>Checks in <span id="checklist-mode">AEO</span> mode</span>,
+                description:<ul id="mode-checks"/>,
+              }]}
+              className="checklist beui-accordion"
+              classNames={{item:'checklist-item',trigger:'checklist-trigger',description:'checklist-description'}}
+            />
+            <div className="validation-launch">
+              <Button type="button" variant="outline" size="md" className="validation-launch-button"
+                onClick={()=>setValidationOpen(true)}>
+                <SlidersHorizontal size={16}/>
+                <span><strong>Validation settings</strong><small>SEO &amp; AEO policies, limits and thresholds</small></span>
+              </Button>
+            </div>
+            <Drawer open={validationOpen} onOpenChange={setValidationOpen} side="right"
+              ariaLabel="SEO and AEO validation settings" className="validation-drawer">
+              <div className="validation-drawer-header">
+                <div><span className="section-kicker">AUDIT POLICY</span>
+                  <h2>Validation settings</h2>
+                  <p>Saved locally and included in exported reports.</p>
+                </div>
+                <Button type="button" variant="ghost" size="icon" aria-label="Close validation settings"
+                  onClick={()=>setValidationOpen(false)}><X size={17}/></Button>
+              </div>
+              <div className="validation-drawer-scroll">
+                <div className="validation-config-body">
                 <div className="validation-config-head">
                   <div>
                     <strong>Policy overrides</strong>
@@ -238,7 +325,7 @@ function App() {
                     placeholder="en, de, fr, it"/>
                 </div>
 
-                <div className="validation-mode-block aeo-only">
+                <div className={'validation-mode-block '+(auditModeUi==='aeo'?'':'hidden')}>
                   <div className="validation-mode-title"><Bot size={16}/><span>AEO validation</span></div>
                   <div className="validation-grid">
                     <Input id="aeo-freshness" type="number" min="0" max="720"
@@ -249,27 +336,25 @@ function App() {
                       label="Max records / shard"
                       value={String(validationConfig.aeo.maxRecordsPerShard)}
                       onChange={value=>updateAeo('maxRecordsPerShard',Number(value))}/>
-                    <label className="validation-select-label" htmlFor="aeo-gtin">GTIN policy
-                      <select id="aeo-gtin" value={validationConfig.aeo.gtinPolicy}
-                        onChange={event=>updateAeo('gtinPolicy',event.target.value as AuditValidationConfig['aeo']['gtinPolicy'])}>
-                        <option value="eligible">Eligible products only</option>
-                        <option value="all">All products</option>
-                        <option value="off">Do not validate GTIN</option>
-                      </select>
-                    </label>
-                    <label className="validation-select-label" htmlFor="aeo-compatibility">Parts compatibility
-                      <select id="aeo-compatibility" value={validationConfig.aeo.partsCompatibility}
-                        onChange={event=>updateAeo('partsCompatibility',event.target.value as AuditValidationConfig['aeo']['partsCompatibility'])}>
-                        <option value="required">Required</option>
-                        <option value="recommended">Recommended</option>
-                        <option value="off">Disabled</option>
-                      </select>
-                    </label>
+                    <SelectField controlId="aeo-gtin" label="GTIN policy" value={validationConfig.aeo.gtinPolicy}
+                      onValueChange={value=>updateAeo('gtinPolicy',value as AuditValidationConfig['aeo']['gtinPolicy'])}
+                      options={[
+                        {value:'eligible',label:'Eligible products only'},
+                        {value:'all',label:'All products'},
+                        {value:'off',label:'Do not validate GTIN'},
+                      ]}/>
+                    <SelectField controlId="aeo-compatibility" label="Parts compatibility" value={validationConfig.aeo.partsCompatibility}
+                      onValueChange={value=>updateAeo('partsCompatibility',value as AuditValidationConfig['aeo']['partsCompatibility'])}
+                      options={[
+                        {value:'required',label:'Required'},
+                        {value:'recommended',label:'Recommended'},
+                        {value:'off',label:'Disabled'},
+                      ]}/>
                   </div>
                   <p className="validation-help">Set freshness to 0 to disable age checks. Quick mode still samples compatibility files; Full mode can prove complete SKU coverage.</p>
                 </div>
 
-                <div className="validation-mode-block seo-only hidden">
+                <div className={'validation-mode-block '+(auditModeUi==='seo'?'':'hidden')}>
                   <div className="validation-mode-title"><Search size={16}/><span>SEO validation</span></div>
                   <div className="validation-grid">
                     <Input id="seo-quick-pages" type="number" min="1" max="200"
@@ -290,21 +375,21 @@ function App() {
                       ['hreflang','hreflang'],
                       ['productJsonLd','Product JSON-LD'],
                     ] as const).map(([key,label])=>(
-                      <label className="validation-select-label" htmlFor={'seo-'+key} key={key}>{label}
-                        <select id={'seo-'+key} value={validationConfig.seo[key]}
-                          onChange={event=>updateSeo(key,event.target.value as AuditValidationConfig['seo'][typeof key])}>
-                          <option value="required">Required → FAIL</option>
-                          <option value="recommended">Recommended → WARNING</option>
-                          <option value="off">Disabled</option>
-                        </select>
-                      </label>
+                      <SelectField key={key} controlId={"seo-"+key} label={label} value={validationConfig.seo[key]}
+                        onValueChange={value=>updateSeo(key,value as AuditValidationConfig['seo'][typeof key])}
+                        options={[
+                          {value:'required',label:'Required → FAIL'},
+                          {value:'recommended',label:'Recommended → WARNING'},
+                          {value:'off',label:'Disabled'},
+                        ]}/>
                     ))}
                   </div>
                   <p className="validation-help">Sitemap lastmod age is optional; 0 disables it. Expected languages are also used to validate hreflang coverage.</p>
                 </div>
                 {validationError && <p className="notification-setting-error" role="alert">{validationError}</p>}
               </div>
-            </details>
+              </div>
+            </Drawer>
             <div className="run-toolbar">
               <Button id="run" size="lg" disabled={runState.running} className="rounded-xl audit-run"><Play size={16} fill="currentColor"/> Run Tests</Button>
               <Button id="stop" variant="outline" size="lg" className="rounded-xl" disabled={!runState.running}>
@@ -368,22 +453,24 @@ function App() {
                 <span id="results-visible">0 matching checks</span>
               </div>
               <div className="results-toolbar-actions">
-                <label htmlFor="result-filter" className="sr-only">Filter audit results</label>
-                <select id="result-filter" defaultValue="all" aria-label="Result severity">
-                  <option value="all">All statuses</option>
-                  <option value="issues">Issues only</option>
-                  <option value="fail">FAIL</option>
-                  <option value="warning">WARNING</option>
-                  <option value="blocked">BLOCKED</option>
-                  <option value="not-run">NOT RUN</option>
-                  <option value="pass">PASS</option>
-                </select>
-                <label htmlFor="result-sort" className="sr-only">Sort findings</label>
-                <select id="result-sort" defaultValue="newest" aria-label="Sort findings">
-                  <option value="newest">Newest first</option>
-                  <option value="oldest">Oldest first</option>
-                  <option value="severity">Failures first</option>
-                </select>
+                <LegacyBoundSelect id="result-filter" defaultValue="all"
+                  ariaLabel="Result severity" className="result-select"
+                  options={[
+                    {value:'all',label:'All statuses'},
+                    {value:'issues',label:'Issues only'},
+                    {value:'fail',label:'FAIL'},
+                    {value:'warning',label:'WARNING'},
+                    {value:'blocked',label:'BLOCKED'},
+                    {value:'not-run',label:'NOT RUN'},
+                    {value:'pass',label:'PASS'},
+                  ]}/>
+                <LegacyBoundSelect id="result-sort" defaultValue="newest"
+                  ariaLabel="Sort findings" className="result-select"
+                  options={[
+                    {value:'newest',label:'Newest first'},
+                    {value:'oldest',label:'Oldest first'},
+                    {value:'severity',label:'Failures first'},
+                  ]}/>
                 <Input id="result-query" type="search" placeholder="Search SKU, URL or test ID"
                   leftIcon={<Search size={16}/>} className="results-search"
                   classNames={{field:"results-search-field",input:"results-search-text"}}/>
@@ -391,8 +478,8 @@ function App() {
             </div>
             <div id="findings" className="findings"/>
           </section>
-        </main>
-      </div>
+        </AnimatedSidebarInset>
+      </AnimatedSidebarProvider>
       <BackToTop/>
     </div>
   );

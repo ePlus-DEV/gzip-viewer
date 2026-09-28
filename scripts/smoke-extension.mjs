@@ -196,7 +196,7 @@ try {
   assert.equal(await sort.inputValue(),'newest','Newest-first must be the default.');
   const newest=await page.locator('#findings .id').allTextContents();
   assert.ok(newest.length>=4,'Smoke fixture should produce several sortable results.');
-  await sort.selectOption('oldest');
+  await sort.selectOption('oldest',{force:true});
   await page.waitForFunction(first=>
     document.querySelector('#findings .id')?.textContent!==first,
     newest[0],
@@ -204,14 +204,14 @@ try {
   const oldest=await page.locator('#findings .id').allTextContents();
   assert.deepEqual(oldest,[...newest].reverse(),
     'Oldest first must show the reverse of the original live event order.');
-  await sort.selectOption('severity');
+  await sort.selectOption('severity',{force:true});
   const severityOrder=await page.locator('#findings .status').allTextContents();
   const severityRank={FAIL:0,BLOCKED:1,WARNING:2,'NOT-RUN':3,PASS:4};
   for(let i=1;i<severityOrder.length;i++){
     assert.ok(severityRank[severityOrder[i-1]]<=severityRank[severityOrder[i]],
       'Failures first must group findings by severity.');
   }
-  await sort.selectOption('newest');
+  await sort.selectOption('newest',{force:true});
   await page.screenshot({path:'artifacts/aeo-results.png',fullPage:true});
 
   await page.reload({waitUntil:'networkidle'});
@@ -220,10 +220,14 @@ try {
   assert.equal(hits('/llms.txt'),1,'Refreshing the results tab must NOT rerun AEO.');
 
   // Validation settings are persisted and must materially change AEO findings.
-  await page.locator('.validation-config > summary').click();
+  await page.getByRole('button',{name:/Validation settings/i}).click();
+  await page.getByRole('dialog',{name:/SEO and AEO validation settings/i}).waitFor({state:'visible'});
   await page.locator('#expected-languages').fill('en, de');
   await page.locator('#expected-languages').blur();
   await page.waitForTimeout(100);
+  // Close the validation drawer before interacting with the dashboard again.
+  await page.getByRole('button',{name:'Close',exact:true}).click();
+  await page.getByRole('dialog',{name:/SEO and AEO validation settings/i}).waitFor({state:'hidden'});
   // The same runner must still allow the user to explicitly start again.
   await page.locator('#run').click();
   await page.waitForFunction(()=>
@@ -238,9 +242,19 @@ try {
     'Configured expected language coverage must turn the missing language into FAIL.');
 
   // Reset AEO overrides, then configure SEO metadata as a required rule.
+  await page.getByRole('button',{name:/Validation settings/i}).click();
+  await page.getByRole('dialog',{name:/SEO and AEO validation settings/i}).waitFor({state:'visible'});
   await page.getByRole('button',{name:/Reset defaults/i}).click();
+  await page.getByRole('button',{name:'Close',exact:true}).click();
+  await page.getByRole('dialog',{name:/SEO and AEO validation settings/i}).waitFor({state:'hidden'});
   await page.getByRole('radio',{name:/SEO Audit/i}).click();
-  await page.locator('#seo-meta').selectOption('required');
+  await page.getByRole('button',{name:/Validation settings/i}).click();
+  await page.getByRole('dialog',{name:/SEO and AEO validation settings/i}).waitFor({state:'visible'});
+  const seoMetaField=page.locator('[data-control-id="seo-meta"]');
+  await seoMetaField.getByRole('button',{name:'Title + meta description'}).click();
+  await seoMetaField.getByRole('option',{name:'Required → FAIL'}).click();
+  await page.getByRole('button',{name:'Close',exact:true}).click();
+  await page.getByRole('dialog',{name:/SEO and AEO validation settings/i}).waitFor({state:'hidden'});
   await page.waitForTimeout(100);
   console.log('Manual rerun smoke PASS: persisted AEO validation settings affect results.');
 
