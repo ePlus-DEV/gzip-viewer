@@ -4,6 +4,7 @@ import {ArrowLeft, ChevronRight, Compass, House, LayoutDashboard, Layers3, Play,
 import {Button} from '../../components/beui/button';
 import {AnimatedBadge} from '../../components/beui/animated-badge';
 import {Input} from '../../components/beui/input';
+import {LegacyBoundSelect} from '../../components/SelectField';
 import {initializeViewer} from './logic';
 import {BackToTop} from '../../components/BackToTop';
 import '../../assets/beui.css';
@@ -23,13 +24,15 @@ function Explorer() {
           <Input id="search" type="search" placeholder="Search records, URLs or shards…"
             aria-label="Search resources" leftIcon={<Search size={17}/>}
             className="viewer-search" classNames={{field:"search-field",input:"viewer-search-input"}}/>
-          <select id="limit" aria-label="Result display limit" defaultValue="500">
-            <option value="100">100 results</option>
-            <option value="500">500 results</option>
-            <option value="1000">1,000 results</option>
-            <option value="5000">5,000 results</option>
-            <option value="0">All results</option>
-          </select>
+          <LegacyBoundSelect id="limit" defaultValue="500" ariaLabel="Result display limit"
+            className="viewer-limit-select"
+            options={[
+              {value:'100',label:'100 results'},
+              {value:'500',label:'500 results'},
+              {value:'1000',label:'1,000 results'},
+              {value:'5000',label:'5,000 results'},
+              {value:'0',label:'All results'},
+            ]}/>
           <Button id="dashboard" variant="outline" className="rounded-lg viewer-action dashboard-link" size="sm"
             title="Return to the main audit dashboard">
             <LayoutDashboard size={16}/> Dashboard
