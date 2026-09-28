@@ -3,13 +3,17 @@ import {browser} from 'wxt/browser';
 import {createRoot} from 'react-dom/client';
 import {Activity, ArrowUpRight, Bot, CheckCircle2, Download, FileCode2,
   Globe2, Layers2, Play, Radar, Search, ShieldCheck, Square, Sparkles,
-  BellRing, Clock3, Hourglass, CalendarClock} from 'lucide-react';
+  BellRing, Clock3, Hourglass, CalendarClock, SlidersHorizontal, RotateCcw} from 'lucide-react';
 import {Button} from '../../components/beui/button';
 import {AnimatedBadge} from '../../components/beui/animated-badge';
 import {Input} from '../../components/beui/input';
 import {Switch} from '../../components/beui/switch';
 import {initializeAuditRunner} from './logic';
 import {COMPLETION_NOTIFICATION_KEY} from '../../lib/audit-notifications';
+import {
+  AUDIT_CONFIG_EVENT, AUDIT_CONFIG_STORAGE_KEY, DEFAULT_AUDIT_CONFIG,
+  normalizeAuditConfig, normalizeExpectedLanguages, type AuditValidationConfig,
+} from '../../lib/audit-config';
 import {BackToTop} from '../../components/BackToTop';
 import '../../assets/beui.css';
 import './style.css';
@@ -21,6 +25,9 @@ function App() {
   const [site, setSite] = useState(initialSite);
   const [startupError, setStartupError] = useState('');
   const [runState,setRunState] = useState({running:false,hasReport:false});
+  const [validationConfig,setValidationConfig] = useState<AuditValidationConfig>(DEFAULT_AUDIT_CONFIG);
+  const [expectedLanguagesText,setExpectedLanguagesText] = useState('');
+  const [validationError,setValidationError] = useState('');
   useEffect(()=>{
     const handler=(event:Event)=> {
       const update=(event as CustomEvent<{running:boolean;hasReport:boolean}>).detail;
@@ -29,6 +36,41 @@ function App() {
     window.addEventListener('audit:run-state',handler);
     return ()=>window.removeEventListener('audit:run-state',handler);
   },[]);
+  useEffect(() => {
+    let alive=true;
+    void browser.storage.local.get(AUDIT_CONFIG_STORAGE_KEY).then(stored=>{
+      if(!alive)return;
+      const next=normalizeAuditConfig(stored[AUDIT_CONFIG_STORAGE_KEY]);
+      setValidationConfig(next);
+      setExpectedLanguagesText(next.expectedLanguages.join(', '));
+      window.dispatchEvent(new CustomEvent(AUDIT_CONFIG_EVENT,{detail:next}));
+    }).catch(()=>{
+      if(alive)setValidationError('Cannot read saved validation settings.');
+    });
+    return ()=>{alive=false;};
+  },[]);
+  function saveValidationConfig(next: AuditValidationConfig) {
+    const normalized=normalizeAuditConfig(next);
+    setValidationConfig(normalized);
+    window.dispatchEvent(new CustomEvent(AUDIT_CONFIG_EVENT,{detail:normalized}));
+    void browser.storage.local.set({[AUDIT_CONFIG_STORAGE_KEY]:normalized})
+      .then(()=>setValidationError(''))
+      .catch(()=>setValidationError('Could not save validation settings.'));
+  }
+  function updateAeo<K extends keyof AuditValidationConfig['aeo']>(
+    key:K,value:AuditValidationConfig['aeo'][K],
+  ){
+    saveValidationConfig({...validationConfig,aeo:{...validationConfig.aeo,[key]:value}});
+  }
+  function updateSeo<K extends keyof AuditValidationConfig['seo']>(
+    key:K,value:AuditValidationConfig['seo'][K],
+  ){
+    saveValidationConfig({...validationConfig,seo:{...validationConfig.seo,[key]:value}});
+  }
+  function resetValidationConfig(){
+    setExpectedLanguagesText('');
+    saveValidationConfig(DEFAULT_AUDIT_CONFIG);
+  }
   useEffect(() => {
     try {initializeAuditRunner();}
     catch (reason) {
@@ -170,6 +212,98 @@ function App() {
             <details className="checklist"><summary><FileCode2 size={16}/>
               Checks in <span id="checklist-mode">AEO</span> mode</summary>
               <ul id="mode-checks"/>
+            </details>
+            <details className="validation-config">
+              <summary><SlidersHorizontal size={16}/>
+                <span><strong>Validation settings</strong><small>Saved locally and included in exported reports.</small></span>
+              </summary>
+              <div className="validation-config-body">
+                <div className="validation-config-head">
+                  <div>
+                    <strong>Policy overrides</strong>
+                    <small>Leave expected languages empty to auto-detect published languages.</small>
+                  </div>
+                  <Button type="button" variant="ghost" size="sm" className="validation-reset"
+                    onClick={resetValidationConfig}><RotateCcw size={14}/> Reset defaults</Button>
+                </div>
+                <div className="validation-grid shared-validation">
+                  <Input id="expected-languages" label="Expected languages"
+                    value={expectedLanguagesText}
+                    onChange={value=>setExpectedLanguagesText(value)}
+                    onBlur={()=>{
+                      const languages=normalizeExpectedLanguages(expectedLanguagesText);
+                      setExpectedLanguagesText(languages.join(', '));
+                      saveValidationConfig({...validationConfig,expectedLanguages:languages});
+                    }}
+                    placeholder="en, de, fr, it"/>
+                </div>
+
+                <div className="validation-mode-block aeo-only">
+                  <div className="validation-mode-title"><Bot size={16}/><span>AEO validation</span></div>
+                  <div className="validation-grid">
+                    <Input id="aeo-freshness" type="number" min="0" max="720"
+                      label="Feed freshness (hours)"
+                      value={String(validationConfig.aeo.feedFreshnessHours)}
+                      onChange={value=>updateAeo('feedFreshnessHours',Number(value))}/>
+                    <Input id="aeo-max-shard" type="number" min="1000" max="500000"
+                      label="Max records / shard"
+                      value={String(validationConfig.aeo.maxRecordsPerShard)}
+                      onChange={value=>updateAeo('maxRecordsPerShard',Number(value))}/>
+                    <label className="validation-select-label" htmlFor="aeo-gtin">GTIN policy
+                      <select id="aeo-gtin" value={validationConfig.aeo.gtinPolicy}
+                        onChange={event=>updateAeo('gtinPolicy',event.target.value as AuditValidationConfig['aeo']['gtinPolicy'])}>
+                        <option value="eligible">Eligible products only</option>
+                        <option value="all">All products</option>
+                        <option value="off">Do not validate GTIN</option>
+                      </select>
+                    </label>
+                    <label className="validation-select-label" htmlFor="aeo-compatibility">Parts compatibility
+                      <select id="aeo-compatibility" value={validationConfig.aeo.partsCompatibility}
+                        onChange={event=>updateAeo('partsCompatibility',event.target.value as AuditValidationConfig['aeo']['partsCompatibility'])}>
+                        <option value="required">Required</option>
+                        <option value="recommended">Recommended</option>
+                        <option value="off">Disabled</option>
+                      </select>
+                    </label>
+                  </div>
+                  <p className="validation-help">Set freshness to 0 to disable age checks. Quick mode still samples compatibility files; Full mode can prove complete SKU coverage.</p>
+                </div>
+
+                <div className="validation-mode-block seo-only hidden">
+                  <div className="validation-mode-title"><Search size={16}/><span>SEO validation</span></div>
+                  <div className="validation-grid">
+                    <Input id="seo-quick-pages" type="number" min="1" max="200"
+                      label="Quick page cap"
+                      value={String(validationConfig.seo.quickPageLimit)}
+                      onChange={value=>updateSeo('quickPageLimit',Number(value))}/>
+                    <Input id="seo-full-pages" type="number" min="1" max="5000"
+                      label="Full page cap"
+                      value={String(validationConfig.seo.fullPageLimit)}
+                      onChange={value=>updateSeo('fullPageLimit',Number(value))}/>
+                    <Input id="seo-lastmod-days" type="number" min="0" max="3650"
+                      label="Sitemap lastmod age (days)"
+                      value={String(validationConfig.seo.sitemapLastmodMaxAgeDays)}
+                      onChange={value=>updateSeo('sitemapLastmodMaxAgeDays',Number(value))}/>
+                    {([
+                      ['canonical','Canonical'],
+                      ['meta','Title + meta description'],
+                      ['hreflang','hreflang'],
+                      ['productJsonLd','Product JSON-LD'],
+                    ] as const).map(([key,label])=>(
+                      <label className="validation-select-label" htmlFor={'seo-'+key} key={key}>{label}
+                        <select id={'seo-'+key} value={validationConfig.seo[key]}
+                          onChange={event=>updateSeo(key,event.target.value as AuditValidationConfig['seo'][typeof key])}>
+                          <option value="required">Required → FAIL</option>
+                          <option value="recommended">Recommended → WARNING</option>
+                          <option value="off">Disabled</option>
+                        </select>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="validation-help">Sitemap lastmod age is optional; 0 disables it. Expected languages are also used to validate hreflang coverage.</p>
+                </div>
+                {validationError && <p className="notification-setting-error" role="alert">{validationError}</p>}
+              </div>
             </details>
             <div className="run-toolbar">
               <Button id="run" size="lg" disabled={runState.running} className="rounded-xl audit-run"><Play size={16} fill="currentColor"/> Run Tests</Button>
