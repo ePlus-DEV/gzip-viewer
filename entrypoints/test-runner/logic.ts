@@ -69,6 +69,7 @@ const sidebarBrowseEl=document.querySelector<HTMLAnchorElement>('#sidebar-browse
 const notificationStatusEl = document.querySelector<HTMLElement>('#notification-status')!;
 let activeValidationConfig: AuditValidationConfig = DEFAULT_AUDIT_CONFIG;
 let hasLiveValidationConfig=false;
+let refreshPending=false;
 window.addEventListener(AUDIT_CONFIG_EVENT, event => {
   const detail=(event as CustomEvent<unknown>).detail;
   activeValidationConfig=normalizeAuditConfig(detail);
@@ -243,18 +244,24 @@ function finding(id: string, level: AuditFinding['level'], summary: string,
   if (url) entry.url = url;
   report.findings.push(entry);
   findingList.schedule(report.findings);
-  refresh();
+  scheduleRefresh();
 }
 
+function scheduleRefresh():void {
+  if(refreshPending)return;
+  refreshPending=true;
+  requestAnimationFrame(()=>{refreshPending=false;refresh();});
+}
 function refresh(): void {
   const statuses = report?.findings ?? [];
+  const counts:Record<AuditFinding['level'],number>={pass:0,fail:0,warning:0,blocked:0,'not-run':0};
+  for(const item of statuses) counts[item.level]++;
   const counters: Record<AuditFinding['level'], string> = {
     pass:'passed', fail:'failed', warning:'warnings',
     blocked:'blocked', 'not-run':'notrun',
   };
-  for (const [status, id] of Object.entries(counters)) {
-    document.getElementById(id)!.textContent = String(
-      statuses.filter(f => f.level === status).length);
+  for (const [status, id] of Object.entries(counters) as [AuditFinding['level'],string][]) {
+    document.getElementById(id)!.textContent = String(counts[status]);
   }
   summaryEl.textContent = '(' + statuses.length + ' checks)';
 }
@@ -315,6 +322,23 @@ async function checkLink(url: string, id: string, expected: URL): Promise<void> 
     finding(id, 'fail', 'Link request failed',
       error instanceof Error ? error.message : String(error), url);
   }
+}
+
+async function checkLinksInBatches(urls:string[], idPrefix:string, expected:URL, onProgress?:(done:number,total:number)=>void):Promise<void>{
+  const concurrency=6;
+  let next=0,done=0;
+  const worker=async()=>{
+    while(true){
+      assertActive();
+      const index=next++;
+      if(index>=urls.length)return;
+      await checkLink(urls[index]!,idPrefix+(index+1),expected);
+      done++;
+      onProgress?.(done,urls.length);
+      if(done%24===0) await new Promise<void>(resolve=>setTimeout(resolve,0));
+    }
+  };
+  await Promise.all(Array.from({length:Math.min(concurrency,urls.length)},()=>worker()));
 }
 
 async function fetchShard(url: string, id: string, expected: URL): Promise<ShardData | null> {
@@ -572,12 +596,10 @@ async function runAeo(): Promise<void> {
         /\/feeds\/parts-compatibility\.json(?:\.gz)?$/i.test(pathname));
     });
     step('2/6 · Checking all ' + genericLinks.length + ' published links…', 15);
-    for (const [i, url] of genericLinks.entries()) {
-      assertActive();
-      await checkLink(url, 'PCL-LINK-' + (i + 1), entered);
-      step('2/6 · Checking published links ' + (i + 1) + '/' + genericLinks.length,
-        15 + 14 * (i + 1) / Math.max(1, genericLinks.length));
-    }
+    await checkLinksInBatches(genericLinks,'PCL-LINK-',entered,(done,total)=>{
+      step('2/6 · Checking published links '+done+'/'+total,
+        15+14*done/Math.max(1,total));
+    });
     const configuredLinks = concrete.length - genericLinks.length;
     if (configuredLinks) finding('PCL-LINK-CONFIGURED', 'not-run', configuredLinks +
       ' product/parts resource link(s) excluded from generic link integrity and validated by AEO configuration below.');
