@@ -109,7 +109,7 @@ export function LegacyBoundSelect({
         ))}
       </select>
       <Select value={value} onValueChange={change}>
-        <SelectTrigger className="beui-select-trigger" aria-label={ariaLabel??label}>
+        <SelectTrigger className="beui-select-trigger" ariaLabel={ariaLabel??label}>
           <SelectValue/>
         </SelectTrigger>
         <SelectContent className="beui-select-content">
