@@ -35,7 +35,7 @@ export function SelectField({
     <div className={'beui-select-field '+(className??'')} data-control-id={controlId}>
       {label ? <span className="beui-select-label">{label}</span> : null}
       <Select value={current} onValueChange={change} disabled={disabled}>
-        <SelectTrigger className="beui-select-trigger">
+        <SelectTrigger className="beui-select-trigger" ariaLabel={label}>
           <SelectValue placeholder={placeholder}/>
         </SelectTrigger>
         <SelectContent className="beui-select-content">
