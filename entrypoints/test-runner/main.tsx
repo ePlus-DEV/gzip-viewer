@@ -1,8 +1,8 @@
 import {useEffect, useState} from 'react';
 import {browser} from 'wxt/browser';
 import {createRoot} from 'react-dom/client';
-import {Activity, ArrowUpRight, Bot, CheckCircle2, Download, FileCode2,
-  Globe2, Layers2, Play, Radar, Search, ShieldCheck, Square, Sparkles,
+import {Activity, ArrowUpRight, Bot, Download, FileCode2,
+  Globe2, Layers2, Play, Search, ShieldCheck, Square, Sparkles,
   BellRing, Clock3, Hourglass, CalendarClock, SlidersHorizontal, RotateCcw,
   PanelLeft, X} from 'lucide-react';
 import {Button} from '../../components/beui/button';
