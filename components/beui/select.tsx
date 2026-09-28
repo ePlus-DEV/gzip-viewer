@@ -198,9 +198,10 @@ export function Select({
 export interface SelectTriggerProps {
   className?: string;
   children: ReactNode;
+  ariaLabel?: string;
 }
 
-export function SelectTrigger({ className, children }: SelectTriggerProps) {
+export function SelectTrigger({ className, children, ariaLabel }: SelectTriggerProps) {
   const ctx = useSelectContext("SelectTrigger");
   const isTop = ctx.placement === "top";
   // edge facing the panel flattens then rounds; the far edge stays rounded.
