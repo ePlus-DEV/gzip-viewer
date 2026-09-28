@@ -6,7 +6,8 @@ import {Activity, ArrowUpRight, Bot, Download, FileCode2,
   BellRing, Clock3, Hourglass, CalendarClock, SlidersHorizontal, RotateCcw,
   PanelLeft, X} from 'lucide-react';
 import {Button} from '../../components/beui/button';
-import {ThemeToggle, type ThemeMode} from '../../components/beui/theme-toggle';
+import {ThemeToggle} from '../../components/beui/theme-toggle';
+import {useTheme} from '../../components/beui/use-theme';
 import {AnimatedBadge} from '../../components/beui/animated-badge';
 import {Input} from '../../components/beui/input';
 import {Switch} from '../../components/beui/switch';
@@ -45,22 +46,7 @@ function App() {
   const [expectedLanguagesText,setExpectedLanguagesText] = useState('');
   const [validationError,setValidationError] = useState('');
   const [validationOpen,setValidationOpen] = useState(false);
-  const [theme,setTheme] = useState<ThemeMode>(()=>document.documentElement.dataset.theme==='dark'?'dark':'light');
-  const applyTheme=(next:ThemeMode)=>{
-    setTheme(next);
-    document.documentElement.dataset.theme=next;
-    document.documentElement.classList.toggle('dark',next==='dark');
-    void browser.storage.local.set({theme:next});
-  };
-  useEffect(()=>{
-    void browser.storage.local.get('theme').then(saved=>{
-      const stored=saved.theme==='dark'||saved.theme==='light'?saved.theme:null;
-      const next:ThemeMode=stored??(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
-      setTheme(next);
-      document.documentElement.dataset.theme=next;
-      document.documentElement.classList.toggle('dark',next==='dark');
-    }).catch(()=>{});
-  },[]);
+  const {theme,changeTheme} = useTheme();
   useEffect(()=>{
     const handler=(event:Event)=> {
       const update=(event as CustomEvent<{running:boolean;hasReport:boolean}>).detail;
@@ -177,7 +163,7 @@ function App() {
           <span><strong>SEO <em>&amp;</em> AEO Auditor</strong><small>Website quality workspace</small></span>
         </div>
         <div className="audit-header-actions">
-          <ThemeToggle theme={theme} onThemeChange={applyTheme}/>
+          <ThemeToggle theme={theme} onThemeChange={changeTheme}/>
           <AnimatedBadge status="info" size="sm" showIcon={false}>LOCAL AUDIT</AnimatedBadge>
           <a id="browse" className="explore-nav" href="#" aria-label="Open resource explorer in the extension">
             <Layers2 size={16}/> Resource Explorer <ArrowUpRight size={14}/>
@@ -228,19 +214,13 @@ function App() {
             <AnimatedSidebarTrigger aria-label="Open workspace navigation"><PanelLeft size={16}/></AnimatedSidebarTrigger>
             <span>Workspace</span>
           </div>
-          <div className="page-eyebrow"><Sparkles size={14}/> AUDIT WORKSPACE</div>
-          <div className="page-head">
-            <div><h1>Site intelligence <span className="hero-accent">workspace.</span></h1>
-              <p>Explore crawlability and AI discovery, compare product feeds, and isolate data issues.</p>
-            </div>
-            <AnimatedBadge status="info" size="md">AUDIT CONSOLE</AnimatedBadge>
-          </div>
+          <div className="workspace-title"><div><h1>Audit</h1><p>Configure, run and review website checks.</p></div></div>
 
           {startupError && <div className="startup-error" role="alert">{startupError}</div>}
           <section className="panel configuration-panel" id="audit-config" aria-labelledby="mode-heading">
             <div className="panel-heading"><div className="heading-icon"><Bot size={19}/></div>
               <div><h2 id="mode-heading">Choose an audit</h2><p>Two specialized suites, one reporting workspace.</p></div>
-              <span className="step-count">STEP 01</span>
+              
             </div>
             <div id="audit-modes">
               <div className="beui-native-radio-bridge" aria-hidden="true">
@@ -272,7 +252,7 @@ function App() {
             <div className="form-divider"/>
             <div className="panel-heading compact"><div className="heading-icon"><Globe2 size={19}/></div>
               <div><h2>Target and scope</h2><p>Select any website that your browser can access.</p></div>
-              <span className="step-count">STEP 02</span>
+              
             </div>
             <label htmlFor="site" className="input-label">Audit entry point</label>
             <Input id="site" type="url" value={site} onChange={setSite}
