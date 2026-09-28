@@ -66,7 +66,7 @@ const activityEl = document.querySelector<HTMLElement>('#activity')!;
 const progressEl = document.querySelector<HTMLProgressElement>('#progress')!;
 const findingsEl = document.querySelector<HTMLElement>('#findings')!;
 const summaryEl = document.querySelector<HTMLElement>('#summary')!;
-const sidebarBrowseEl=document.querySelector<HTMLAnchorElement>('#sidebar-browse');
+const sidebarBrowseEl=document.querySelector<HTMLAnchorElement>('#sidebar-browse-slot a');
 const notificationStatusEl = document.querySelector<HTMLElement>('#notification-status')!;
 let activeValidationConfig: AuditValidationConfig = DEFAULT_AUDIT_CONFIG;
 let hasLiveValidationConfig=false;
@@ -1026,6 +1026,7 @@ const params = new URLSearchParams(location.search);
 const scopeFromPopup = params.get('scope');
 if (scopeFromPopup === 'quick' || scopeFromPopup === 'full') {
   scopeEl.value = scopeFromPopup;
+  scopeEl.dispatchEvent(new Event('change',{bubbles:true}));
 }
 if (params.get('mode') === 'seo') {
   const seo = modeInputs.find(input => input.value === 'seo');
