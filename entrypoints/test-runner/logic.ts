@@ -482,7 +482,7 @@ async function runAeo(): Promise<void> {
   catch { activityEl.textContent = 'Enter a valid HTTP(S) site URL.'; return; }
   const llms = new URL('/llms.txt', entered.origin);
   const scope = scopeEl.value as Scope;
-  const linkLimit = Number(linksEl.value);
+  // Generic discovery links are always checked. Product/parts depth is controlled by validation config.
   controller = new AbortController();
   report = {
     mode: 'aeo', plannedChecks: [...AUDIT_MODES.aeo.checks],
@@ -540,11 +540,10 @@ async function runAeo(): Promise<void> {
               'A GET link check is not evidence that a POST endpoint works.', target);
             continue;
           }
-          if (++tested <= (scope === 'quick' ? 10 : 40)) {
-            await checkLink(target, 'PCL-AGENTS-LINK-' + tested, entered);
-          }
+          tested++;
+          await checkLink(target, 'PCL-AGENTS-LINK-' + tested, entered);
         }
-        const untested = Math.max(0, tested - (scope === 'quick' ? 10 : 40));
+        const untested = 0;
         if (templated) finding('PCL-AGENTS-TEMPLATES', 'not-run',
           templated + ' template endpoint(s) need real SKU/language/shard substitution.',
           'The product JSON and actual published shard checks below cover representative real URLs.', agentsURL);
@@ -568,23 +567,21 @@ async function runAeo(): Promise<void> {
     const discovered = parsed.groups.flatMap(g => g.links).filter(link => !link.placeholders.length);
     const concrete = [...new Set(discovered.map(link => resolveLink(link, llms.href)).filter(
       (url): url is string => typeof url === 'string'))];
-    const limit = linkLimit ? concrete.slice(0, linkLimit) : concrete;
-    step('2/6 · Checking ' + limit.length + ' published links…', 15);
-    for (const [i, url] of limit.entries()) {
-      assertActive();
-      // Large product/compatibility resources are fetched and parsed later;
-      // avoid downloading them twice during the generic link pass.
+    const genericLinks = concrete.filter(url => {
       const pathname = new URL(url).pathname;
-      if (/\.(?:jsonl|ndjson)\.gz$/i.test(pathname) ||
-          /\/feeds\/parts-compatibility\.json(?:\.gz)?$/i.test(pathname)) continue;
+      return !(/\.(?:jsonl|ndjson)\.gz$/i.test(pathname) ||
+        /\/feeds\/parts-compatibility\.json(?:\.gz)?$/i.test(pathname));
+    });
+    step('2/6 · Checking all ' + genericLinks.length + ' published links…', 15);
+    for (const [i, url] of genericLinks.entries()) {
+      assertActive();
       await checkLink(url, 'PCL-LINK-' + (i + 1), entered);
-      step('2/6 · Checking published links ' + (i + 1) + '/' + limit.length,
-        15 + 14 * (i + 1) / Math.max(1, limit.length));
+      step('2/6 · Checking published links ' + (i + 1) + '/' + genericLinks.length,
+        15 + 14 * (i + 1) / Math.max(1, genericLinks.length));
     }
-    if (limit.length < concrete.length) {
-      finding('PCL-LINK-SCOPE', 'not-run', concrete.length - limit.length +
-        ' published llms.txt links excluded by the selected link limit.');
-    }
+    const configuredLinks = concrete.length - genericLinks.length;
+    if (configuredLinks) finding('PCL-LINK-CONFIGURED', 'not-run', configuredLinks +
+      ' product/parts resource link(s) excluded from generic link integrity and validated by AEO configuration below.');
     // Only follow XML sitemap links explicitly published from llms.txt.
     const sitemaps = concrete.filter(url => /\.xml(?:\.gz)?$/i.test(new URL(url).pathname));
     let xmlChildren = 0;
