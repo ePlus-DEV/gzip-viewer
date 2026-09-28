@@ -83,7 +83,7 @@ export function RadioGroup({
 
 export interface RadioGroupItemProps {
   value: string;
-  label?: string;
+  label?: ReactNode;
   disabled?: boolean;
   className?: string;
   id?: string;
