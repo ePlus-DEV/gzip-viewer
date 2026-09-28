@@ -22,7 +22,7 @@ import {
 } from '../../lib/audit-config';
 import {
   type AuditFinding, type ShardData, type ShardRecord,
-  checkProduct, compareLanguageShards, parseShard, sampleProducts,
+  checkProduct, compareLanguageShards, sampleProducts,
 } from '../../lib/cross-test';
 
 type Scope = 'quick' | 'full';
