@@ -9,6 +9,10 @@ import { parseLlms, resolveLink, type LlmsDocument, type ResourceLink } from '..
 import { parseSitemap, type ParsedSitemap } from '../../lib/sitemap';
 import { childTrail, documentLabel, readTrail, viewerHref as routedHref, type NavItem } from '../../lib/navigation';
 import {dashboardHref} from '../../lib/dashboard-navigation';
+import {
+  auditCompatibilityIndex, auditCompatibilityShard, compatibilityDocumentKind,
+  type CompatibilityIndexAudit, type CompatibilityShardAudit,
+} from '../../lib/parts-compatibility';
 
 type Mode = ReturnType<typeof determineFormat>;
 
@@ -21,6 +25,8 @@ interface ViewerState {
   text: string;
   llms: LlmsDocument | null;
   sitemap: ParsedSitemap | null;
+  compatibilityIndex: CompatibilityIndexAudit | null;
+  compatibilityShard: CompatibilityShardAudit | null;
 }
 
 export function initializeViewer(): void {
@@ -49,6 +55,7 @@ const treeEl = document.querySelector<HTMLDivElement>('#tree')!;
 let state: ViewerState = {
   mode: null, rows: [], invalid: 0, index: null, json: null, text: '',
   llms: null, sitemap: null,
+  compatibilityIndex: null, compatibilityShard: null,
 };
 
 function setStatus(message: string, level: 'ok' | 'warn' | 'error' | '' = ''): void {
@@ -275,6 +282,158 @@ function renderRows(): void {
   );
 }
 
+function renderCompatibilityIndex(): void {
+  const audit = state.compatibilityIndex!;
+  modeEl.textContent = 'PARTS COMPATIBILITY INDEX';
+  const term = searchEl.value.trim().toLocaleLowerCase();
+  const matching = term ? audit.files.filter(file =>
+    [file.make, String(file.page), file.url].join(' ').toLocaleLowerCase().includes(term)
+  ) : audit.files;
+  const max = Number(limitEl.value);
+  const visible = max ? matching.slice(0, max) : matching;
+
+  metricsEl.replaceChildren(
+    metric('Schema', audit.schemaVersion || '—'),
+    metric('Models (declared)', audit.totalModels?.toLocaleString() ?? '—'),
+    metric('Published files', audit.files.length.toLocaleString()),
+    metric('Makes', new Set(audit.files.map(file => file.make.toLocaleUpperCase())).size),
+    metric('Validation issues', audit.issues.length),
+  );
+
+  const panel = node('div');
+  if (audit.issues.length) panel.append(showIssues(audit.issues.slice(0, 50)));
+  const table = node('table');
+  const head = node('thead');
+  const header = node('tr');
+  for (const label of ['Make', 'Page', 'URL', 'Action']) header.append(node('th', label));
+  head.append(header);
+  const body = node('tbody');
+  for (const file of visible) {
+    const tr = node('tr');
+    const source = node('td');
+    const rawLink = externalAnchor(file.url, file.url);
+    if (rawLink) source.append(rawLink);
+    else source.textContent = file.url;
+    const action = node('td');
+    const explore = externalAnchor(
+      'Explore shard', file.url, true,
+      file.make + ' · page ' + file.page,
+    );
+    if (explore) action.append(explore);
+    tr.append(
+      node('td', file.make),
+      node('td', String(file.page)),
+      source,
+      action,
+    );
+    body.append(tr);
+  }
+  table.append(head, body);
+  panel.append(table);
+  itemsEl.replaceChildren(panel);
+  setStatus(
+    visible.length.toLocaleString() + ' shown / ' +
+      matching.length.toLocaleString() + ' matched / ' +
+      audit.files.length.toLocaleString() + ' compatibility files',
+    audit.issues.some(issue => issue.severity === 'error') ? 'error' :
+      audit.issues.length ? 'warn' : 'ok',
+  );
+}
+
+function fitmentYearText(
+  fitment: CompatibilityShardAudit['vehicles'][number]['fitments'][number],
+): string {
+  if (fitment.yearStatus !== 'known') return 'Unknown';
+  if (fitment.yearStart === null || fitment.yearEnd === null) return 'Known · invalid range';
+  return fitment.yearStart === fitment.yearEnd
+    ? String(fitment.yearStart)
+    : fitment.yearStart + '–' + fitment.yearEnd;
+}
+
+function compatibilityVehicleSearchText(
+  vehicle: CompatibilityShardAudit['vehicles'][number],
+): string {
+  return [
+    vehicle.modelCode, vehicle.make, vehicle.model,
+    vehicle.engineCc === null ? '' : String(vehicle.engineCc),
+    ...vehicle.fitments.flatMap(fitment => [
+      fitment.yearStatus,
+      fitment.yearStart === null ? '' : String(fitment.yearStart),
+      fitment.yearEnd === null ? '' : String(fitment.yearEnd),
+      fitment.fitmentInfo || '',
+      ...fitment.compatibleSkus,
+    ]),
+  ].join(' ').toLocaleLowerCase();
+}
+
+function renderCompatibilityShard(): void {
+  const audit = state.compatibilityShard!;
+  modeEl.textContent = 'PARTS COMPATIBILITY';
+  const term = searchEl.value.trim().toLocaleLowerCase();
+  const matching = term
+    ? audit.vehicles.filter(vehicle => compatibilityVehicleSearchText(vehicle).includes(term))
+    : audit.vehicles;
+  const max = Number(limitEl.value);
+  const visible = max ? matching.slice(0, max) : matching;
+
+  metricsEl.replaceChildren(
+    metric('Manufacturer', audit.manufacturer || '—'),
+    metric('Page', audit.page ?? '—'),
+    metric('Vehicles', audit.vehicles.length.toLocaleString()),
+    metric('Fitments', audit.fitmentCount.toLocaleString()),
+    metric('Unique compatible SKUs', audit.uniqueCompatibleSkus.length.toLocaleString()),
+    metric('Validation issues', audit.issues.length),
+  );
+
+  const container = node('div');
+  if (audit.issues.length) container.append(showIssues(audit.issues.slice(0, 50)));
+  for (const vehicle of visible) {
+    const details = node('details', undefined, 'compatibility-vehicle');
+    const cc = vehicle.engineCc === null ? '— cc' : vehicle.engineCc + ' cc';
+    details.append(node(
+      'summary',
+      vehicle.make + ' · ' + vehicle.model + ' · ' + cc +
+        ' · code ' + (vehicle.modelCode || '—') +
+        ' · ' + vehicle.fitments.length + ' fitment(s)',
+    ));
+    details.addEventListener('toggle', () => {
+      if (!details.open || details.dataset.loaded) return;
+      details.dataset.loaded = '1';
+      const table = node('table');
+      const head = node('thead');
+      const header = node('tr');
+      for (const label of ['Year', 'Fitment information', 'Compatible SKUs']) {
+        header.append(node('th', label));
+      }
+      head.append(header);
+      const body = node('tbody');
+      for (const fitment of vehicle.fitments) {
+        const tr = node('tr');
+        const skus = fitment.compatibleSkus;
+        const preview = skus.slice(0, 20).join(', ') +
+          (skus.length > 20 ? ' … +' + (skus.length - 20) + ' more' : '');
+        tr.append(
+          node('td', fitmentYearText(fitment)),
+          node('td', fitment.fitmentInfo || '—'),
+          node('td', preview || '—'),
+        );
+        body.append(tr);
+      }
+      table.append(head, body);
+      details.append(table);
+    });
+    container.append(details);
+  }
+  itemsEl.replaceChildren(container);
+  setStatus(
+    visible.length.toLocaleString() + ' shown / ' +
+      matching.length.toLocaleString() + ' matched / ' +
+      audit.vehicles.length.toLocaleString() + ' vehicles',
+    audit.issues.some(issue => issue.severity === 'error') ? 'error' :
+      audit.issues.length ? 'warn' : 'ok',
+  );
+}
+
 function renderJson(): void {
   const panel = node('div');
   const doc = state.json;
@@ -464,6 +623,8 @@ function render(): void {
   if (state.mode === 'sitemap') return renderSitemap();
   if (state.mode === 'feed-index') return renderIndex();
   if (state.mode === 'jsonl') return renderRows();
+  if (state.mode === 'json' && state.compatibilityIndex) return renderCompatibilityIndex();
+  if (state.mode === 'json' && state.compatibilityShard) return renderCompatibilityShard();
   if (state.mode === 'json') return renderJson();
   if (state.mode === 'text') return renderText();
 }
@@ -485,7 +646,10 @@ async function load(): Promise<void> {
   sourceEl.textContent = 'Source: ' + url.origin + url.pathname;
   itemsEl.replaceChildren();
   metricsEl.replaceChildren();
-  state = {mode: null, rows: [], invalid: 0, index: null, json: null, text: '', llms: null, sitemap: null};
+  state = {
+    mode: null, rows: [], invalid: 0, index: null, json: null, text: '',
+    llms: null, sitemap: null, compatibilityIndex: null, compatibilityShard: null,
+  };
   setStatus('Fetching…');
   reloadEl.disabled = true;
 
@@ -510,6 +674,12 @@ async function load(): Promise<void> {
       state.invalid = parsed.invalid;
     } else if (state.mode === 'json') {
       state.json = JSON.parse(text) as unknown;
+      const compatibilityKind = compatibilityDocumentKind(state.json);
+      if (compatibilityKind === 'index') {
+        state.compatibilityIndex = auditCompatibilityIndex(state.json, url.href);
+      } else if (compatibilityKind === 'shard') {
+        state.compatibilityShard = auditCompatibilityShard(state.json);
+      }
     } else {
       state.text = text;
     }
