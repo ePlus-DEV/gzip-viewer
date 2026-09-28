@@ -2,7 +2,8 @@ import {useEffect} from 'react';
 import {createRoot} from 'react-dom/client';
 import {ArrowLeft, ChevronRight, Compass, House, LayoutDashboard, Layers3, Play, RotateCw, Search} from 'lucide-react';
 import {Button} from '../../components/beui/button';
-import {AnimatedBadge} from '../../components/beui/animated-badge';
+import {ThemeToggle} from '../../components/beui/theme-toggle';
+import {useTheme} from '../../components/beui/use-theme';
 import {Input} from '../../components/beui/input';
 import {LegacyBoundSelect} from '../../components/SelectField';
 import {initializeViewer} from './logic';
@@ -11,6 +12,7 @@ import '../../assets/beui.css';
 import './style.css';
 
 function Explorer() {
+  const {theme,changeTheme}=useTheme();
   useEffect(() => { initializeViewer(); }, []);
   return (
     <div className="viewer-shell">
@@ -18,9 +20,9 @@ function Explorer() {
         <div className="viewer-brand">
           <span className="viewer-logo"><img src="/icon-48.png" alt="" width={38} height={38}/></span>
           <span><strong>SEO <em>&amp;</em> AEO Auditor</strong><small>Resource Explorer</small></span>
-          <AnimatedBadge status="neutral" size="sm" showIcon={false}>Browse</AnimatedBadge>
         </div>
         <div className="viewer-controls">
+          <ThemeToggle theme={theme} onThemeChange={changeTheme}/>
           <Input id="search" type="search" placeholder="Search records, URLs or shards…"
             aria-label="Search resources" leftIcon={<Search size={17}/>}
             className="viewer-search" classNames={{field:"search-field",input:"viewer-search-input"}}/>
@@ -58,7 +60,7 @@ function Explorer() {
       </nav>
       <div id="explorer">
         <aside id="outline" aria-label="Resource tree">
-          <div className="sidebar-label"><Layers3 size={16}/> RESOURCE TREE</div>
+          <div className="sidebar-label"><Layers3 size={16}/> Resources</div>
           <div id="tree"/>
           <div className="sidebar-help">
             <ChevronRight size={15}/> Select any link to explore related feeds, sitemaps or products. Use Back to return.
@@ -66,8 +68,7 @@ function Explorer() {
         </aside>
         <div id="content">
           <div className="document-head">
-            <div><div className="section-kicker">RESOURCE INSPECTOR</div>
-              <h1>Resource inspector <span id="mode"/></h1>
+            <div><h1>Resource inspector <span id="mode"/></h1>
             </div>
           </div>
           <div id="source"/>
