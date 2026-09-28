@@ -1,4 +1,5 @@
 export const AUDIT_CONFIG_STORAGE_KEY = 'auditValidationConfigV1';
+export const AUDIT_CONFIG_EVENT = 'audit:validation-config';
 
 export type RuleLevel = 'required' | 'recommended' | 'off';
 export type GtinPolicy = 'eligible' | 'all' | 'off';
