@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useRef, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from './beui/select';
@@ -60,6 +60,7 @@ export function LegacyBoundSelect({
 }:LegacyBoundSelectProps){
   const nativeRef=useRef<HTMLSelectElement>(null);
   const [options,setOptions]=useState<SelectOption[]>([...initialOptions]);
+  const [nativeOptions,setNativeOptions]=useState<SelectOption[]>([...initialOptions]);
   const [value,setValue]=useState(defaultValue);
 
   useEffect(()=>{
@@ -72,6 +73,7 @@ export function LegacyBoundSelect({
         disabled:option.disabled,
       }));
       setOptions(next);
+      setNativeOptions(next);
       setValue(native.value || next[0]?.value || '');
     };
     const observer=new MutationObserver(sync);
@@ -86,8 +88,6 @@ export function LegacyBoundSelect({
       native.removeEventListener('change',sync);
     };
   },[]);
-
-  const nativeOptions=useMemo(()=>initialOptions,[initialOptions]);
 
   function change(next:string){
     const native=nativeRef.current;
