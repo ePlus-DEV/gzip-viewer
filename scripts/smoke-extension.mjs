@@ -85,7 +85,6 @@ const body = (pathname) => {
         '<url><loc>'+origin+'/en/product/test-item</loc></url></urlset>'];
     case '/en/product/test-item':
       return ['text/html', '<!doctype html><html lang="en"><head><title>Test item</title>'+
-        '<meta name="description" content="Test product">'+
         '<link rel="canonical" href="'+origin+'/en/product/test-item">'+
         '<script type="application/ld+json">'+JSON.stringify({
           '@context':'https://schema.org','@type':'Product',name:'Test item',
@@ -219,6 +218,12 @@ try {
   assert.match(await page.locator('#activity').innerText(),/Ready\. Choose a mode/,
     'Refreshing a completed audit must return to idle, not repeat a scan.');
   assert.equal(hits('/llms.txt'),1,'Refreshing the results tab must NOT rerun AEO.');
+
+  // Validation settings are persisted and must materially change AEO findings.
+  await page.locator('.validation-config > summary').click();
+  await page.locator('#expected-languages').fill('en, de');
+  await page.locator('#expected-languages').blur();
+  await page.waitForTimeout(100);
   // The same runner must still allow the user to explicitly start again.
   await page.locator('#run').click();
   await page.waitForFunction(()=>
@@ -228,7 +233,16 @@ try {
   assert.equal(hits('/llms.txt'),2,'The manually triggered rerun must execute once.');
   assert.equal(hits('/feeds/parts-compatibility-honda.json.gz'),2,
     'Manual rerun must perform compatibility validation exactly once again.');
-  console.log('Manual rerun smoke PASS: no refresh loop and Run remains functional.');
+  const langFinding=page.locator('#findings .test').filter({hasText:'PCL-LANG'}).first();
+  assert.match(await langFinding.innerText(),/FAIL/,
+    'Configured expected language coverage must turn the missing language into FAIL.');
+
+  // Reset AEO overrides, then configure SEO metadata as a required rule.
+  await page.getByRole('button',{name:/Reset defaults/i}).click();
+  await page.getByRole('radio',{name:/SEO Audit/i}).click();
+  await page.locator('#seo-meta').selectOption('required');
+  await page.waitForTimeout(100);
+  console.log('Manual rerun smoke PASS: persisted AEO validation settings affect results.');
 
   // Select SEO in a fresh popup: the new SEO tab must start without another click.
   const seoPopup=await context.newPage();
@@ -252,7 +266,10 @@ try {
   assert.equal(hits('/robots.txt'),1,'One popup click must start exactly one SEO scan.');
   const seoPass=Number(await seoPage.locator('#passed').innerText());
   assert.ok(seoPass>=3,'SEO must crawl a real XML sitemap and page.');
-  console.log('SEO autorun smoke PASS: '+seoPass+' live checks.');
+  const seoMetaFinding=seoPage.locator('#findings .test').filter({hasText:'-META'}).first();
+  assert.match(await seoMetaFinding.innerText(),/FAIL/,
+    'Required SEO metadata config must promote a missing description from warning to FAIL.');
+  console.log('SEO autorun smoke PASS: '+seoPass+' live checks with required metadata policy.');
   await seoPage.screenshot({path:'artifacts/seo-results.png',fullPage:true});
 
   // A deep-linked XML resource has no ancestors, so Back and Home are disabled;

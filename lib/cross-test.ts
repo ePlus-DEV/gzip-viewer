@@ -1,4 +1,5 @@
 import {isRecord, httpUrl} from './feed';
+import type {GtinPolicy} from './audit-config';
 
 export interface AuditFinding {
   id: string;
@@ -24,7 +25,11 @@ const INVARIANT_KEYS = [
   'image_link', 'is_eligible_search', 'is_eligible_checkout',
 ] as const;
 
-export function parseShard(text: string, maxIssues = 20): ShardData {
+export function parseShard(
+  text: string,
+  maxIssues = 20,
+  gtinPolicy: GtinPolicy = 'all',
+): ShardData {
   const records: ShardRecord[] = [];
   const issues: string[] = [];
   let malformed = 0;
@@ -40,8 +45,11 @@ export function parseShard(text: string, maxIssues = 20): ShardData {
         if (issues.length < maxIssues) issues.push('Line ' + (index + 1) + ': expected JSON object.');
       } else {
         records.push(value);
-        if (!value.gtin && issues.length < maxIssues) {
-          issues.push('Line ' + (index + 1) + ': GTIN missing; check feed eligibility rule.');
+        const eligible = value.is_eligible_search === true || value.is_eligible_checkout === true;
+        const requireGtin = gtinPolicy === 'all' || (gtinPolicy === 'eligible' && eligible);
+        if (requireGtin && !value.gtin && issues.length < maxIssues) {
+          issues.push('Line ' + (index + 1) +
+            ': GTIN missing under the selected GTIN validation policy.');
         }
       }
     } catch (error) {

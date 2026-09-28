@@ -8,6 +8,15 @@ describe('cross-test runner', () => {
     expect(data.malformed).toBe(1);
     expect(data.records.map(r => r.sku)).toEqual(['1','2']);
   });
+  it('applies GTIN policy only to configured product eligibility', () => {
+    const text = [
+      JSON.stringify({sku:'1',is_eligible_search:true}),
+      JSON.stringify({sku:'2',is_eligible_search:false}),
+    ].join('\n');
+    expect(parseShard(text,20,'eligible').issues).toHaveLength(1);
+    expect(parseShard(text,20,'all').issues).toHaveLength(2);
+    expect(parseShard(text,20,'off').issues).toHaveLength(0);
+  });
   it('detects same-count but different SKU order', () => {
     const en = [{sku:'A', gtin:'1'}, {sku:'B', gtin:'2'}];
     const de = [{sku:'B', gtin:'2'}, {sku:'A', gtin:'1'}];

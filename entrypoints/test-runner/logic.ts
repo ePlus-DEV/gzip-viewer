@@ -17,6 +17,10 @@ import {
 } from '../../lib/audit-notifications';
 import {estimateStageRemainingMs, formatDuration, stageFromMessage, type AuditStage} from '../../lib/audit-timing';
 import {
+  AUDIT_CONFIG_EVENT, AUDIT_CONFIG_STORAGE_KEY, DEFAULT_AUDIT_CONFIG,
+  isStale, normalizeAuditConfig, ruleLevel, type AuditValidationConfig,
+} from '../../lib/audit-config';
+import {
   type AuditFinding, type ShardData, type ShardRecord,
   checkProduct, compareLanguageShards, parseShard, sampleProducts,
 } from '../../lib/cross-test';
@@ -30,6 +34,7 @@ interface Report {
   durationMs?: number;
   origin: string;
   scope: Scope;
+  config: AuditValidationConfig;
   findings: AuditFinding[];
   checkedShards: number;
   sampledProducts: number;
@@ -63,6 +68,23 @@ const findingsEl = document.querySelector<HTMLElement>('#findings')!;
 const summaryEl = document.querySelector<HTMLElement>('#summary')!;
 const sidebarBrowseEl=document.querySelector<HTMLAnchorElement>('#sidebar-browse');
 const notificationStatusEl = document.querySelector<HTMLElement>('#notification-status')!;
+let activeValidationConfig: AuditValidationConfig = DEFAULT_AUDIT_CONFIG;
+let hasLiveValidationConfig=false;
+window.addEventListener(AUDIT_CONFIG_EVENT, event => {
+  const detail=(event as CustomEvent<unknown>).detail;
+  activeValidationConfig=normalizeAuditConfig(detail);
+  hasLiveValidationConfig=true;
+});
+async function validationConfigForRun(): Promise<AuditValidationConfig> {
+  if (hasLiveValidationConfig) return normalizeAuditConfig(activeValidationConfig);
+  try {
+    const stored=await browser.storage.local.get(AUDIT_CONFIG_STORAGE_KEY);
+    activeValidationConfig=normalizeAuditConfig(stored[AUDIT_CONFIG_STORAGE_KEY]);
+  } catch {
+    activeValidationConfig=normalizeAuditConfig(activeValidationConfig);
+  }
+  return activeValidationConfig;
+}
 let controller: AbortController | null = null;
 let report: Report | null = null;
 let displayCount = 0;
@@ -305,13 +327,15 @@ async function fetchShard(url: string, id: string, expected: URL): Promise<Shard
       return null;
     }
     const text = await responseText(response);
-    const data = parseShard(text);
+    const data = parseShard(text, 20, activeValidationConfig.aeo.gtinPolicy);
     report!.checkedShards++;
     finding(id, data.malformed ? 'fail' : 'pass',
       'Shard parsed: ' + data.records.length.toLocaleString() + ' JSON records',
       data.malformed ? data.issues.join(' | ') : 'Decoded in browser memory.', url);
-    finding(id + '-CAP', data.records.length > 50000 ? 'fail' : 'pass',
-      'Shard size: ' + data.records.length.toLocaleString() + ' / 50,000 maximum',
+    const maxRecords=activeValidationConfig.aeo.maxRecordsPerShard;
+    finding(id + '-CAP', data.records.length > maxRecords ? 'fail' : 'pass',
+      'Shard size: ' + data.records.length.toLocaleString() + ' / ' +
+        maxRecords.toLocaleString() + ' configured maximum',
       undefined, url);
     if (data.issues.length) {
       finding(id + '-SCHEMA', 'warning', 'Product feed metadata issues',
@@ -439,6 +463,8 @@ function renderMode(): void {
       card.querySelector<HTMLInputElement>('input')?.checked === true));
   document.querySelectorAll('.aeo-only').forEach(element =>
     element.classList.toggle('hidden', mode === 'seo'));
+  document.querySelectorAll('.seo-only').forEach(element =>
+    element.classList.toggle('hidden', mode !== 'seo'));
   browseEl.textContent = 'Explore ' + definition.startingFile.slice(1);
   try {
     const entered = httpUrl(siteEl.value.trim());
@@ -452,6 +478,8 @@ function renderMode(): void {
 
 async function runAeo(): Promise<void> {
   if (controller) return;
+  const config=await validationConfigForRun();
+  if (controller) return;
   let entered: URL;
   try { entered = httpUrl(siteEl.value.trim()); }
   catch { activityEl.textContent = 'Enter a valid HTTP(S) site URL.'; return; }
@@ -461,7 +489,7 @@ async function runAeo(): Promise<void> {
   controller = new AbortController();
   report = {
     mode: 'aeo', plannedChecks: [...AUDIT_MODES.aeo.checks],
-    startedAt: new Date().toISOString(), origin: entered.origin, scope,
+    startedAt: new Date().toISOString(), origin: entered.origin, scope, config,
     findings: [], checkedShards: 0, sampledProducts: 0, checkedLinks: 0, stopped: false, completed: false,
   };
   findingsEl.replaceChildren();
@@ -615,6 +643,16 @@ async function runAeo(): Promise<void> {
     finding('PCL-DOMAIN', wrongHosts.length ? 'fail' : 'pass',
       'Shard domains: ' + wrongHosts.length + ' unexpected hosts',
       wrongHosts.slice(0, 5).map(s => s.url).join(' | '));
+
+    const freshnessHours=config.aeo.feedFreshnessHours;
+    if (freshnessHours > 0) {
+      const stale=index.shards.filter(shard => isStale(shard.lastModified, freshnessHours));
+      finding('PCL-FRESHNESS', stale.length ? 'warning' : 'pass',
+        'Feed freshness: ' + stale.length + ' shard(s) older than ' + freshnessHours + 'h',
+        stale.slice(0, 8).map(shard =>
+          shard.language + ': ' + (shard.lastModified || 'missing timestamp') + ' · ' + shard.url
+        ).join(' | '), feedURL);
+    }
     const groups = new Map<string, Map<string, string>>();
     for (const shard of index.shards) {
       const match = new URL(shard.url).pathname.match(/products-([a-z]{2})-(\d+)\.(?:jsonl|ndjson)(?:\.gz)?$/i);
@@ -632,12 +670,20 @@ async function runAeo(): Promise<void> {
     }
     const declaredLanguages = index.languages;
     const languagesFromLlms = parsed.languages;
-    const missingFromIndex = languagesFromLlms.filter(lang => !declaredLanguages.includes(lang));
-    finding('PCL-LANG', missingFromIndex.length ? 'warning' : 'pass',
+    const configuredLanguages=config.expectedLanguages.map(lang => lang.split('-')[0]!);
+    const expectedLanguages=configuredLanguages.length
+      ? [...new Set(configuredLanguages)]
+      : languagesFromLlms;
+    const missingFromIndex = expectedLanguages.filter(lang => !declaredLanguages.includes(lang));
+    finding('PCL-LANG', missingFromIndex.length ?
+      (config.expectedLanguages.length ? 'fail' : 'warning') : 'pass',
       'Published feed languages: ' + declaredLanguages.join(', '),
-      missingFromIndex.length ? 'Storefront languages without a published feed: ' +
-        missingFromIndex.join(', ') + '. Confirm whether the feed supports a smaller subset.' :
-        'All storefront languages listed in llms.txt have a published feed.');
+      missingFromIndex.length ? 'Expected languages without a published feed: ' +
+        missingFromIndex.join(', ') + '. ' +
+        (config.expectedLanguages.length ? 'Configured expected-language coverage is incomplete.' :
+          'Confirm whether the feed supports a smaller subset.') :
+        (config.expectedLanguages.length ? 'All configured languages have a published feed.' :
+          'All storefront languages listed in llms.txt have a published feed.'));
     const reference = declaredLanguages.includes(referenceEl.value) ? referenceEl.value :
       declaredLanguages[0];
     if (!reference) {
@@ -714,12 +760,17 @@ async function runAeo(): Promise<void> {
         38 + 42 * (idx + 1) / selected.length);
     }
     step('5/6 · Loading parts compatibility index…', 82);
+    const compatibilityRule=config.aeo.partsCompatibility;
     const compatibilityURL = concrete.find(url =>
       /\/feeds\/parts-compatibility\.json(?:\.gz)?$/i.test(new URL(url).pathname));
-    if (!compatibilityURL) {
-      finding('PCL-COMPAT-INDEX', 'blocked',
+    if (compatibilityRule === 'off') {
+      finding('PCL-COMPAT-CONFIG', 'not-run',
+        'Parts compatibility validation is disabled by configuration.', undefined, llms.href);
+    } else if (!compatibilityURL) {
+      const missingLevel=ruleLevel(compatibilityRule) ?? 'warning';
+      finding('PCL-COMPAT-INDEX', missingLevel,
         'No parts-compatibility.json.gz index is published in llms.txt.',
-        'Publish the compatibility index so file/domain/schema/SKU coverage can be tested.', llms.href);
+        'Publish the compatibility index or change the AEO compatibility policy.', llms.href);
     } else {
       let compatibilityIndexComplete = false;
       const compatibilitySkus = new Set<string>();
@@ -889,6 +940,8 @@ async function runAeo(): Promise<void> {
 
 async function runSeo(): Promise<void> {
   if (controller) return;
+  const config=await validationConfigForRun();
+  if (controller) return;
   let entered: URL;
   try { entered = httpUrl(siteEl.value.trim()); }
   catch { activityEl.textContent = 'Enter a valid HTTP(S) site URL.'; return; }
@@ -896,7 +949,7 @@ async function runSeo(): Promise<void> {
   controller = new AbortController();
   report = {
     mode: 'seo', plannedChecks: [...AUDIT_MODES.seo.checks],
-    startedAt: new Date().toISOString(), origin: entered.origin, scope,
+    startedAt: new Date().toISOString(), origin: entered.origin, scope, config,
     findings: [], checkedShards: 0, sampledProducts: 0, checkedLinks: 0, stopped: false, completed: false,
   };
   findingsEl.replaceChildren();
@@ -915,7 +968,7 @@ async function runSeo(): Promise<void> {
   void browser.storage.local.set({lastUrl: robotsURL});
   try {
     await runSeoAudit({
-      root: entered, scope,
+      root: entered, scope, config,
       fetchPage: fetchResponse, report: finding, redirectOK: checkRedirect,
       progress: step, assertActive, linkChecked: () => { if (report) report.checkedLinks++; },
     });
