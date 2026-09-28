@@ -231,7 +231,7 @@ function App() {
               </div>
               <RadioGroup value={auditModeUi} onValueChange={value=>changeAuditMode(value as 'aeo'|'seo')}
                 orientation="horizontal" className="mode-cards">
-                <RadioGroupItem value="aeo" className="mode-card"
+                <RadioGroupItem value="aeo" ariaLabel="AEO Audit" className="mode-card"
                   label={<>
                     <span className="card-icon aeo"><Bot size={21}/></span>
                     <span className="mode-desc"><strong>AEO Audit</strong>
@@ -239,7 +239,7 @@ function App() {
                       <span className="mode-tags">llms.txt · agents.md · JSONL.GZ</span>
                     </span>
                   </>}/>
-                <RadioGroupItem value="seo" className="mode-card"
+                <RadioGroupItem value="seo" ariaLabel="SEO Audit" className="mode-card"
                   label={<>
                     <span className="card-icon seo"><Search size={21}/></span>
                     <span className="mode-desc"><strong>SEO Audit</strong>
@@ -336,14 +336,14 @@ function App() {
                       label="Max records / shard"
                       value={String(validationConfig.aeo.maxRecordsPerShard)}
                       onChange={value=>updateAeo('maxRecordsPerShard',Number(value))}/>
-                    <SelectField label="GTIN policy" value={validationConfig.aeo.gtinPolicy}
+                    <SelectField controlId="aeo-gtin" label="GTIN policy" value={validationConfig.aeo.gtinPolicy}
                       onValueChange={value=>updateAeo('gtinPolicy',value as AuditValidationConfig['aeo']['gtinPolicy'])}
                       options={[
                         {value:'eligible',label:'Eligible products only'},
                         {value:'all',label:'All products'},
                         {value:'off',label:'Do not validate GTIN'},
                       ]}/>
-                    <SelectField label="Parts compatibility" value={validationConfig.aeo.partsCompatibility}
+                    <SelectField controlId="aeo-compatibility" label="Parts compatibility" value={validationConfig.aeo.partsCompatibility}
                       onValueChange={value=>updateAeo('partsCompatibility',value as AuditValidationConfig['aeo']['partsCompatibility'])}
                       options={[
                         {value:'required',label:'Required'},
@@ -375,7 +375,7 @@ function App() {
                       ['hreflang','hreflang'],
                       ['productJsonLd','Product JSON-LD'],
                     ] as const).map(([key,label])=>(
-                      <SelectField key={key} label={label} value={validationConfig.seo[key]}
+                      <SelectField key={key} controlId={"seo-"+key} label={label} value={validationConfig.seo[key]}
                         onValueChange={value=>updateSeo(key,value as AuditValidationConfig['seo'][typeof key])}
                         options={[
                           {value:'required',label:'Required → FAIL'},
