@@ -18,10 +18,11 @@ interface SelectFieldProps {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  controlId?: string;
 }
 
 export function SelectField({
-  label,value,defaultValue,options,onValueChange,placeholder,className,disabled,
+  label,value,defaultValue,options,onValueChange,placeholder,className,disabled,controlId,
 }:SelectFieldProps){
   const controlled=value!==undefined;
   const [internal,setInternal]=useState(defaultValue??options[0]?.value??'');
@@ -31,7 +32,7 @@ export function SelectField({
     onValueChange?.(next);
   };
   return (
-    <div className={'beui-select-field '+(className??'')}>
+    <div className={'beui-select-field '+(className??'')} data-control-id={controlId}>
       {label ? <span className="beui-select-label">{label}</span> : null}
       <Select value={current} onValueChange={change} disabled={disabled}>
         <SelectTrigger className="beui-select-trigger">
@@ -56,6 +57,7 @@ interface LegacyBoundSelectProps {
   options: readonly SelectOption[];
   className?: string;
   ariaLabel?: string;
+  controlId?: string;
 }
 
 /**
@@ -64,7 +66,7 @@ interface LegacyBoundSelectProps {
  * bridge for legacy querySelector/value/change code.
  */
 export function LegacyBoundSelect({
-  id,label,defaultValue,options:initialOptions,className,ariaLabel,
+  id,label,defaultValue,options:initialOptions,className,ariaLabel,controlId,
 }:LegacyBoundSelectProps){
   const nativeRef=useRef<HTMLSelectElement>(null);
   const [options,setOptions]=useState<SelectOption[]>([...initialOptions]);
@@ -106,7 +108,7 @@ export function LegacyBoundSelect({
   }
 
   return (
-    <div className={'beui-select-field '+(className??'')}>
+    <div className={'beui-select-field '+(className??'')} data-control-id={controlId??id}>
       {label ? <span className="beui-select-label">{label}</span> : null}
       <select ref={nativeRef} id={id} defaultValue={defaultValue}
         className="beui-native-select-bridge" aria-hidden="true" tabIndex={-1}>
