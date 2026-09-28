@@ -225,6 +225,9 @@ try {
   await page.locator('#expected-languages').fill('en, de');
   await page.locator('#expected-languages').blur();
   await page.waitForTimeout(100);
+  // Close the validation drawer before interacting with the dashboard again.
+  await page.getByRole('button',{name:'Close',exact:true}).click();
+  await page.getByRole('dialog',{name:/SEO and AEO validation settings/i}).waitFor({state:'hidden'});
   // The same runner must still allow the user to explicitly start again.
   await page.locator('#run').click();
   await page.waitForFunction(()=>
@@ -239,9 +242,17 @@ try {
     'Configured expected language coverage must turn the missing language into FAIL.');
 
   // Reset AEO overrides, then configure SEO metadata as a required rule.
+  await page.getByRole('button',{name:/Validation settings/i}).click();
+  await page.getByRole('dialog',{name:/SEO and AEO validation settings/i}).waitFor({state:'visible'});
   await page.getByRole('button',{name:/Reset defaults/i}).click();
+  await page.getByRole('button',{name:'Close',exact:true}).click();
+  await page.getByRole('dialog',{name:/SEO and AEO validation settings/i}).waitFor({state:'hidden'});
   await page.getByRole('radio',{name:/SEO Audit/i}).click();
+  await page.getByRole('button',{name:/Validation settings/i}).click();
+  await page.getByRole('dialog',{name:/SEO and AEO validation settings/i}).waitFor({state:'visible'});
   await page.locator('#seo-meta').selectOption('required',{force:true});
+  await page.getByRole('button',{name:'Close',exact:true}).click();
+  await page.getByRole('dialog',{name:/SEO and AEO validation settings/i}).waitFor({state:'hidden'});
   await page.waitForTimeout(100);
   console.log('Manual rerun smoke PASS: persisted AEO validation settings affect results.');
 
