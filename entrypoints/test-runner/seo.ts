@@ -3,12 +3,16 @@ import {responseText} from '../../lib/decompress';
 import {httpUrl, isRecord} from '../../lib/feed';
 import {isProductPage, isSitemapUrl, parseRobots, pickPageSamples, sameHost, type TestScope} from '../../lib/audit-modes';
 import type {AuditFinding} from '../../lib/cross-test';
+import {
+  expectedLanguageBase, isStale, ruleLevel, type AuditValidationConfig,
+} from '../../lib/audit-config';
 
 type Level = AuditFinding['level'];
 
 export interface SeoAuditContext {
   root: URL;
   scope: TestScope;
+  config: AuditValidationConfig;
   fetchPage: (url: string) => Promise<Response>;
   report: (id: string, level: Level, summary: string, detail?: string, url?: string) => void;
   redirectOK: (response: Response, expected: URL, id: string) => boolean;
@@ -18,7 +22,6 @@ export interface SeoAuditContext {
 }
 
 const MAX_SITEMAPS = {quick: 3, full: 100} as const;
-const MAX_PAGES = {quick: 15, full: 500} as const;
 const MAX_DISCOVERED = 20000;
 const MAX_HREFLANG = {quick: 20, full: 500} as const;
 
@@ -53,7 +56,7 @@ function structuredProducts(doc: Document): {products: Record<string, unknown>[]
 }
 
 export async function runSeoAudit(ctx: SeoAuditContext): Promise<void> {
-  const {root, scope, report, fetchPage, redirectOK, progress, assertActive, linkChecked} = ctx;
+  const {root, scope, config, report, fetchPage, redirectOK, progress, assertActive, linkChecked} = ctx;
   const robotsUrl = new URL('/robots.txt', root).href;
   const sitemapCandidates: string[] = [];
   progress('SEO 1/4 · Reading robots.txt and finding XML sitemaps…', 5);
@@ -99,7 +102,9 @@ export async function runSeoAudit(ctx: SeoAuditContext): Promise<void> {
   let skippedSitemaps = 0;
   let skippedPages = 0;
   const sitemapBudget = MAX_SITEMAPS[scope];
-  const maximumPages = MAX_PAGES[scope];
+  const maximumPages = scope === 'quick'
+    ? config.seo.quickPageLimit
+    : config.seo.fullPageLimit;
 
   progress('SEO 2/4 · Crawling XML sitemap indexes…', 22);
   while (queue.length && seen.size < sitemapBudget) {
@@ -126,6 +131,17 @@ export async function runSeoAudit(ctx: SeoAuditContext): Promise<void> {
       report('SEO-02-XML', sitemap.issues.length ? 'warning' : 'pass',
         sitemap.title + ': ' + sitemap.entries.length + ' entries',
         sitemap.issues.slice(0, 6).join(' | '), url);
+      if (config.seo.sitemapLastmodMaxAgeDays > 0) {
+        const stale=sitemap.entries.filter(entry =>
+          entry.kind === 'url' && entry.lastModified &&
+          isStale(entry.lastModified, config.seo.sitemapLastmodMaxAgeDays * 24));
+        report('SEO-02-LASTMOD', stale.length ? 'warning' : 'pass',
+          'Sitemap lastmod: ' + stale.length + ' URL(s) older than ' +
+            config.seo.sitemapLastmodMaxAgeDays + ' day(s)',
+          stale.slice(0, 8).map(entry =>
+            (entry.lastModified || 'missing') + ' · ' + entry.url
+          ).join(' | '), url);
+      }
       for (const entry of sitemap.entries) {
         if (!sameHost(entry.url, root.href)) {
           report('SEO-02-ENTRY-HOST', 'fail', 'Sitemap contains unexpected hostname',
@@ -199,33 +215,39 @@ export async function runSeoAudit(ctx: SeoAuditContext): Promise<void> {
       const doc = new DOMParser().parseFromString(html, 'text/html');
       const title = doc.querySelector('title')?.textContent?.trim() || '';
       const description = childText(doc, 'meta[name="description"]');
-      report(pageId + '-META', title && description ? 'pass' : 'warning',
-        'Page title and meta description',
-        !title ? 'Missing <title>.' : !description ? 'Missing meta description.' : undefined, pageUrl);
+      const metaLevel=ruleLevel(config.seo.meta);
+      if (metaLevel) {
+        report(pageId + '-META', title && description ? 'pass' : metaLevel,
+          'Page title and meta description',
+          !title ? 'Missing <title>.' : !description ? 'Missing meta description.' : undefined, pageUrl);
+      }
       const robots = Array.from(doc.querySelectorAll('meta[name="robots"]'))
         .map(tag => tag.getAttribute('content') || '').join(',').toLowerCase();
       report(pageId + '-INDEX', /(?:^|[, ]+)noindex\b/.test(robots) ? 'fail' : 'pass',
         /(?:^|[, ]+)noindex\b/.test(robots) ? 'Sitemap page has noindex directive.' : 'No HTML noindex directive.',
         undefined, pageUrl);
-      const canonicals = Array.from(doc.querySelectorAll('link[rel~="canonical"]'))
-        .map(tag => tag.getAttribute('href')).filter((href): href is string => Boolean(href));
-      if (canonicals.length !== 1) {
-        report(pageId + '-CANONICAL', 'warning',
-          canonicals.length ? 'Multiple canonical URLs' : 'Canonical URL missing.',
-          undefined, pageUrl);
-      } else {
-        try {
-          const canonical = httpUrl(canonicals[0]!, pageUrl);
-          report(pageId + '-CANONICAL',
-            !sameHost(canonical.href, root.href) ? 'fail' :
-              canonical.pathname !== new URL(pageUrl).pathname ? 'warning' : 'pass',
-            'Canonical URL: ' + canonical.href,
-            canonical.pathname !== new URL(pageUrl).pathname ?
-              'Check intentional canonicalization before removing this URL from the sitemap.' : undefined,
-            pageUrl);
-        } catch {
-          report(pageId + '-CANONICAL', 'fail', 'Invalid canonical URL',
-            canonicals[0], pageUrl);
+      const canonicalLevel=ruleLevel(config.seo.canonical);
+      if (canonicalLevel) {
+        const canonicals = Array.from(doc.querySelectorAll('link[rel~="canonical"]'))
+          .map(tag => tag.getAttribute('href')).filter((href): href is string => Boolean(href));
+        if (canonicals.length !== 1) {
+          report(pageId + '-CANONICAL', canonicalLevel,
+            canonicals.length ? 'Multiple canonical URLs' : 'Canonical URL missing.',
+            undefined, pageUrl);
+        } else {
+          try {
+            const canonical = httpUrl(canonicals[0]!, pageUrl);
+            report(pageId + '-CANONICAL',
+              !sameHost(canonical.href, root.href) ? 'fail' :
+                canonical.pathname !== new URL(pageUrl).pathname ? canonicalLevel : 'pass',
+              'Canonical URL: ' + canonical.href,
+              canonical.pathname !== new URL(pageUrl).pathname ?
+                'Canonical path differs from the sitemap URL.' : undefined,
+              pageUrl);
+          } catch {
+            report(pageId + '-CANONICAL', 'fail', 'Invalid canonical URL',
+              canonicals[0], pageUrl);
+          }
         }
       }
       const lang = doc.documentElement.getAttribute('lang')?.trim().toLowerCase() || '';
@@ -236,12 +258,14 @@ export async function runSeoAudit(ctx: SeoAuditContext): Promise<void> {
       prefix && lang && lang.split('-')[0] !== prefix ?
         'URL language prefix ' + prefix + ' does not match document lang.' : undefined, pageUrl);
 
-      const alternates = Array.from(doc.querySelectorAll('link[rel~="alternate"][hreflang]'))
-        .map(link => ({
-          language: link.getAttribute('hreflang')?.trim().toLowerCase() || '',
-          href: link.getAttribute('href') || '',
-        }));
-      if (alternates.length) {
+      const hreflangLevel=ruleLevel(config.seo.hreflang);
+      const alternates = hreflangLevel ? Array.from(
+        doc.querySelectorAll('link[rel~="alternate"][hreflang]')
+      ).map(link => ({
+        language: link.getAttribute('hreflang')?.trim().toLowerCase() || '',
+        href: link.getAttribute('href') || '',
+      })) : [];
+      if (hreflangLevel && alternates.length) {
         const langs = new Set<string>();
         let duplicate = 0;
         for (const alt of alternates) {
@@ -273,45 +297,59 @@ export async function runSeoAudit(ctx: SeoAuditContext): Promise<void> {
             report(pageId + '-HREF-URL', 'fail', 'Invalid hreflang URL', alt.href, pageUrl);
           }
         }
-        report(pageId + '-HREFLANG', duplicate ? 'warning' :
-          prefix && !langs.has(prefix) && ![...langs].some(x => x.startsWith(prefix + '-')) ? 'warning' : 'pass',
-        alternates.length + ' hreflang link(s); ' + duplicate + ' duplicate locale(s)',
-        prefix && !langs.has(prefix) ? 'Confirm self-referencing locale in hreflang set.' : undefined, pageUrl);
-      } else {
-        report(pageId + '-HREFLANG', prefix ? 'warning' : 'not-run',
-          prefix ? 'Localized URL without hreflang links.' : 'No locale prefix; hreflang not applicable or not published.',
-          undefined, pageUrl);
+        const expected=config.expectedLanguages.map(expectedLanguageBase).filter(Boolean);
+        const missingExpected=[...new Set(expected)].filter(expected =>
+          ![...langs].some(language => expectedLanguageBase(language) === expected));
+        const selfMissing=Boolean(prefix &&
+          ![...langs].some(language => expectedLanguageBase(language) === prefix));
+        const hasIssue=duplicate > 0 || missingExpected.length > 0 || selfMissing;
+        report(pageId + '-HREFLANG', hasIssue ? hreflangLevel : 'pass',
+          alternates.length + ' hreflang link(s); ' + duplicate + ' duplicate locale(s)',
+          [
+            selfMissing ? 'Missing self-referencing locale ' + prefix + '.' : '',
+            missingExpected.length ? 'Missing configured locales: ' + missingExpected.join(', ') + '.' : '',
+          ].filter(Boolean).join(' ' ) || undefined, pageUrl);
+      } else if (hreflangLevel) {
+        const expected=config.expectedLanguages.length > 0;
+        report(pageId + '-HREFLANG', prefix || expected ? hreflangLevel : 'not-run',
+          prefix || expected ? 'Expected hreflang links are missing.' :
+            'No locale prefix; hreflang not applicable or not published.',
+          expected ? 'Configured expected languages: ' + config.expectedLanguages.join(', ') : undefined,
+          pageUrl);
       }
 
-      const jsonld = structuredProducts(doc);
-      if (jsonld.malformed) {
-        report(pageId + '-LD-SYNTAX', 'warning', jsonld.malformed +
-          ' JSON-LD script(s) contain invalid JSON.', undefined, pageUrl);
-      }
-      if (isProductPage(pageUrl)) {
-        const product = jsonld.products[0];
-        if (!product) {
-          report(pageId + '-PRODUCT-LD', 'warning',
-            'Product detail has no server-rendered Product JSON-LD.',
-            'Client-generated JSON-LD requires a browser-rendered follow-up check.', pageUrl);
-        } else {
-          const offer = isRecord(product.offers) ? product.offers : {};
-          const errors = [
-            !product.sku ? 'sku' : '',
-            !product.name ? 'name' : '',
-            !product.image ? 'image' : '',
-            !offer.price ? 'offers.price' : '',
-            !offer.priceCurrency ? 'offers.priceCurrency' : '',
-          ].filter(Boolean);
-          report(pageId + '-PRODUCT-LD', errors.length ? 'warning' : 'pass',
-            'Product JSON-LD detected on product-detail page.',
-            errors.length ? 'Missing recommended properties: ' + errors.join(', ') : undefined,
-            pageUrl);
+      const productLdLevel=ruleLevel(config.seo.productJsonLd);
+      if (productLdLevel) {
+        const jsonld = structuredProducts(doc);
+        if (jsonld.malformed) {
+          report(pageId + '-LD-SYNTAX', productLdLevel, jsonld.malformed +
+            ' JSON-LD script(s) contain invalid JSON.', undefined, pageUrl);
         }
-      } else {
-        report(pageId + '-LD', 'pass',
-          jsonld.products.length + ' Product JSON-LD object(s) in server HTML.',
-          undefined, pageUrl);
+        if (isProductPage(pageUrl)) {
+          const product = jsonld.products[0];
+          if (!product) {
+            report(pageId + '-PRODUCT-LD', productLdLevel,
+              'Product detail has no server-rendered Product JSON-LD.',
+              'Client-generated JSON-LD requires a browser-rendered follow-up check.', pageUrl);
+          } else {
+            const offer = isRecord(product.offers) ? product.offers : {};
+            const errors = [
+              !product.sku ? 'sku' : '',
+              !product.name ? 'name' : '',
+              !product.image ? 'image' : '',
+              !offer.price ? 'offers.price' : '',
+              !offer.priceCurrency ? 'offers.priceCurrency' : '',
+            ].filter(Boolean);
+            report(pageId + '-PRODUCT-LD', errors.length ? productLdLevel : 'pass',
+              'Product JSON-LD detected on product-detail page.',
+              errors.length ? 'Missing configured properties: ' + errors.join(', ') : undefined,
+              pageUrl);
+          }
+        } else {
+          report(pageId + '-LD', 'pass',
+            jsonld.products.length + ' Product JSON-LD object(s) in server HTML.',
+            undefined, pageUrl);
+        }
       }
     } catch (error) {
       assertActive();
