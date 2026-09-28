@@ -4,7 +4,7 @@ import {createRoot} from 'react-dom/client';
 import {Activity, ArrowUpRight, Bot, CheckCircle2, Download, FileCode2,
   Globe2, Layers2, Play, Radar, Search, ShieldCheck, Square, Sparkles,
   BellRing, Clock3, Hourglass, CalendarClock, SlidersHorizontal, RotateCcw,
-  PanelLeft} from 'lucide-react';
+  PanelLeft, X} from 'lucide-react';
 import {Button} from '../../components/beui/button';
 import {AnimatedBadge} from '../../components/beui/animated-badge';
 import {Input} from '../../components/beui/input';
@@ -19,6 +19,7 @@ import {
 import {LegacyBoundSelect, SelectField} from '../../components/SelectField';
 import {RadioGroup, RadioGroupItem} from '../../components/beui/radio';
 import {BouncyAccordion} from '../../components/beui/bouncy-accordion';
+import {Drawer} from '../../components/beui/drawer';
 import {initializeAuditRunner} from './logic';
 import {COMPLETION_NOTIFICATION_KEY} from '../../lib/audit-notifications';
 import {
@@ -42,6 +43,7 @@ function App() {
   const [validationConfig,setValidationConfig] = useState<AuditValidationConfig>(DEFAULT_AUDIT_CONFIG);
   const [expectedLanguagesText,setExpectedLanguagesText] = useState('');
   const [validationError,setValidationError] = useState('');
+  const [validationOpen,setValidationOpen] = useState(false);
   useEffect(()=>{
     const handler=(event:Event)=> {
       const update=(event as CustomEvent<{running:boolean;hasReport:boolean}>).detail;
@@ -284,12 +286,25 @@ function App() {
               className="checklist beui-accordion"
               classNames={{item:'checklist-item',trigger:'checklist-trigger',description:'checklist-description'}}
             />
-            <BouncyAccordion
-              items={[{
-                id:'validation',
-                icon:<SlidersHorizontal size={16}/>,
-                title:<span className="validation-accordion-title"><strong>Validation settings</strong><small>Saved locally and included in exported reports.</small></span>,
-                description:<div className="validation-config-body">
+            <div className="validation-launch">
+              <Button type="button" variant="outline" size="md" className="validation-launch-button"
+                onClick={()=>setValidationOpen(true)}>
+                <SlidersHorizontal size={16}/>
+                <span><strong>Validation settings</strong><small>SEO &amp; AEO policies, limits and thresholds</small></span>
+              </Button>
+            </div>
+            <Drawer open={validationOpen} onOpenChange={setValidationOpen} side="right"
+              ariaLabel="SEO and AEO validation settings" className="validation-drawer">
+              <div className="validation-drawer-header">
+                <div><span className="section-kicker">AUDIT POLICY</span>
+                  <h2>Validation settings</h2>
+                  <p>Saved locally and included in exported reports.</p>
+                </div>
+                <Button type="button" variant="ghost" size="icon" aria-label="Close validation settings"
+                  onClick={()=>setValidationOpen(false)}><X size={17}/></Button>
+              </div>
+              <div className="validation-drawer-scroll">
+                <div className="validation-config-body">
                 <div className="validation-config-head">
                   <div>
                     <strong>Policy overrides</strong>
@@ -310,7 +325,7 @@ function App() {
                     placeholder="en, de, fr, it"/>
                 </div>
 
-                <div className="validation-mode-block aeo-only">
+                <div className={'validation-mode-block '+(auditModeUi==='aeo'?'':'hidden')}>
                   <div className="validation-mode-title"><Bot size={16}/><span>AEO validation</span></div>
                   <div className="validation-grid">
                     <Input id="aeo-freshness" type="number" min="0" max="720"
@@ -339,7 +354,7 @@ function App() {
                   <p className="validation-help">Set freshness to 0 to disable age checks. Quick mode still samples compatibility files; Full mode can prove complete SKU coverage.</p>
                 </div>
 
-                <div className="validation-mode-block seo-only hidden">
+                <div className={'validation-mode-block '+(auditModeUi==='seo'?'':'hidden')}>
                   <div className="validation-mode-title"><Search size={16}/><span>SEO validation</span></div>
                   <div className="validation-grid">
                     <Input id="seo-quick-pages" type="number" min="1" max="200"
@@ -372,10 +387,9 @@ function App() {
                   <p className="validation-help">Sitemap lastmod age is optional; 0 disables it. Expected languages are also used to validate hreflang coverage.</p>
                 </div>
                 {validationError && <p className="notification-setting-error" role="alert">{validationError}</p>}
-              </div>,
-              }]}
-              className="validation-config beui-accordion"
-              classNames={{item:'validation-accordion-item',trigger:'validation-accordion-trigger',description:'validation-accordion-description'}}
+              </div>
+              </div>
+            </Drawer>
             />
             <div className="run-toolbar">
               <Button id="run" size="lg" disabled={runState.running} className="rounded-xl audit-run"><Play size={16} fill="currentColor"/> Run Tests</Button>
