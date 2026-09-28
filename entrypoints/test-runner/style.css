@@ -633,3 +633,24 @@ progress{height:10px;accent-color:#20b89b;border-radius:99px}
 :root[data-theme="dark"] .audit-sidebar-panel [aria-current="page"]{background:#162b49!important;border-color:#28496f!important}
 :root[data-theme="dark"] .mode-card:has(button[data-state="checked"]){background:color-mix(in srgb,var(--ui-accent) 10%,var(--ui-panel))!important}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .audit-sidebar-panel{background:#091426!important}}
+
+/* Sidebar interaction states: active stays active; hover never paints a light/disabled-looking pill. */
+.audit-sidebar-panel [data-slot="sidebar-menu"] a,
+.audit-sidebar-panel [data-slot="sidebar-menu"] button{
+  transition:background-color .16s ease,color .16s ease,border-color .16s ease!important;
+}
+.audit-sidebar-panel [data-slot="sidebar-menu"] a:not([aria-current="page"]):hover,
+.audit-sidebar-panel [data-slot="sidebar-menu"] button:not([aria-current="page"]):hover{
+  background:#142641!important;
+  border-color:#203a5f!important;
+  color:#eef5ff!important;
+}
+.audit-sidebar-panel [aria-current="page"],
+.audit-sidebar-panel [aria-current="page"]:hover{
+  background:#1b3152!important;
+  border-color:#29496f!important;
+  color:#fff!important;
+  box-shadow:inset 3px 0 0 #4f8cff!important;
+}
+.audit-sidebar-panel [aria-current="page"] svg,
+.audit-sidebar-panel [aria-current="page"]:hover svg{color:#78a8ff!important}
