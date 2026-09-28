@@ -267,12 +267,6 @@ function App() {
                 ]}/>
               <LegacyBoundSelect id="reference" label="Reference language" defaultValue="en"
                 className="aeo-only" options={[{value:'en',label:'en (default)'}]}/>
-              <LegacyBoundSelect id="links" label="Links from llms.txt" defaultValue="15"
-                className="aeo-only" options={[
-                  {value:'15',label:'First 15 links'},
-                  {value:'50',label:'First 50 links'},
-                  {value:'0',label:'All published links'},
-                ]}/>
             </div>
             <BouncyAccordion
               items={[{
