@@ -4,8 +4,10 @@ import {createRoot} from 'react-dom/client';
 import {Activity, ArrowUpRight, Bot, Download, FileCode2,
   Globe2, Layers2, Play, Search, ShieldCheck, Square, Sparkles,
   BellRing, Clock3, Hourglass, CalendarClock, SlidersHorizontal, RotateCcw,
-  PanelLeft, X, Moon, Sun} from 'lucide-react';
+  PanelLeft, X} from 'lucide-react';
 import {Button} from '../../components/beui/button';
+import {ThemeToggle} from '../../components/beui/theme-toggle';
+import {useTheme} from '../../components/beui/use-theme';
 import {AnimatedBadge} from '../../components/beui/animated-badge';
 import {Input} from '../../components/beui/input';
 import {Switch} from '../../components/beui/switch';
@@ -44,21 +46,7 @@ function App() {
   const [expectedLanguagesText,setExpectedLanguagesText] = useState('');
   const [validationError,setValidationError] = useState('');
   const [validationOpen,setValidationOpen] = useState(false);
-  const [darkMode,setDarkMode] = useState(()=>document.documentElement.dataset.theme==='dark');
-  function toggleTheme(){
-    const next=!darkMode;
-    setDarkMode(next);
-    document.documentElement.dataset.theme=next?'dark':'light';
-    void browser.storage.local.set({theme:next?'dark':'light'});
-  }
-  useEffect(()=>{
-    void browser.storage.local.get('theme').then(saved=>{
-      if(saved.theme==='dark'||saved.theme==='light'){
-        document.documentElement.dataset.theme=saved.theme;
-        setDarkMode(saved.theme==='dark');
-      }
-    }).catch(()=>{});
-  },[]);
+  const {theme,changeTheme} = useTheme();
   useEffect(()=>{
     const handler=(event:Event)=> {
       const update=(event as CustomEvent<{running:boolean;hasReport:boolean}>).detail;
@@ -175,7 +163,7 @@ function App() {
           <span><strong>SEO <em>&amp;</em> AEO Auditor</strong><small>Website quality workspace</small></span>
         </div>
         <div className="audit-header-actions">
-          <Button type="button" variant="ghost" size="icon" aria-label={darkMode?"Use light mode":"Use dark mode"} onClick={toggleTheme}>{darkMode?<Sun size={17}/>:<Moon size={17}/>}</Button>
+          <ThemeToggle theme={theme} onThemeChange={changeTheme}/>
           <AnimatedBadge status="info" size="sm" showIcon={false}>LOCAL AUDIT</AnimatedBadge>
           <a id="browse" className="explore-nav" href="#" aria-label="Open resource explorer in the extension">
             <Layers2 size={16}/> Resource Explorer <ArrowUpRight size={14}/>
@@ -226,19 +214,13 @@ function App() {
             <AnimatedSidebarTrigger aria-label="Open workspace navigation"><PanelLeft size={16}/></AnimatedSidebarTrigger>
             <span>Workspace</span>
           </div>
-          <div className="page-eyebrow"><Sparkles size={14}/> AUDIT WORKSPACE</div>
-          <div className="page-head">
-            <div><h1>Site intelligence <span className="hero-accent">workspace.</span></h1>
-              <p>Explore crawlability and AI discovery, compare product feeds, and isolate data issues.</p>
-            </div>
-            <AnimatedBadge status="info" size="md">AUDIT CONSOLE</AnimatedBadge>
-          </div>
+          <div className="workspace-title"><div><h1>Audit</h1><p>Configure, run and review website checks.</p></div></div>
 
           {startupError && <div className="startup-error" role="alert">{startupError}</div>}
           <section className="panel configuration-panel" id="audit-config" aria-labelledby="mode-heading">
             <div className="panel-heading"><div className="heading-icon"><Bot size={19}/></div>
               <div><h2 id="mode-heading">Choose an audit</h2><p>Two specialized suites, one reporting workspace.</p></div>
-              <span className="step-count">STEP 01</span>
+              
             </div>
             <div id="audit-modes">
               <div className="beui-native-radio-bridge" aria-hidden="true">
@@ -270,7 +252,7 @@ function App() {
             <div className="form-divider"/>
             <div className="panel-heading compact"><div className="heading-icon"><Globe2 size={19}/></div>
               <div><h2>Target and scope</h2><p>Select any website that your browser can access.</p></div>
-              <span className="step-count">STEP 02</span>
+              
             </div>
             <label htmlFor="site" className="input-label">Audit entry point</label>
             <Input id="site" type="url" value={site} onChange={setSite}
@@ -285,12 +267,6 @@ function App() {
                 ]}/>
               <LegacyBoundSelect id="reference" label="Reference language" defaultValue="en"
                 className="aeo-only" options={[{value:'en',label:'en (default)'}]}/>
-              <LegacyBoundSelect id="links" label="Links from llms.txt" defaultValue="15"
-                className="aeo-only" options={[
-                  {value:'15',label:'First 15 links'},
-                  {value:'50',label:'First 50 links'},
-                  {value:'0',label:'All published links'},
-                ]}/>
             </div>
             <BouncyAccordion
               items={[{

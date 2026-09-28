@@ -103,3 +103,21 @@ body{background:#f3f7fe;}
 .popup-site-input .website-field {position:relative;padding:0;}
 .popup-site-input .website-field > input {padding-left:44px;padding-right:13px;}
 .popup-site-input .website-field > span:first-child {left:13px;top:50%;}
+
+/* Unified launcher: product UI, not a marketing card. */
+body{background:var(--ui-page)!important;color:var(--ui-text)}
+.popup-shell{box-sizing:border-box;background:var(--ui-page);padding:16px 18px 14px!important}
+.popup-top{padding-bottom:14px!important;border-bottom:1px solid var(--ui-border)}
+.popup-top-actions{display:flex;align-items:center;gap:7px}
+.popup-intro{display:flex;flex-direction:column;gap:3px;padding:15px 0 2px}
+.popup-intro strong{font-size:15px;letter-spacing:-.025em}
+.popup-intro span{font-size:10px;color:var(--ui-subtle)}
+.popup-section{margin-top:15px!important}
+.section-caption{margin-bottom:7px!important}
+.mode-options{gap:8px!important}
+.mode-option{min-height:82px!important;padding:11px!important;background:var(--ui-panel)!important;border:1px solid var(--ui-border)!important;box-shadow:none!important;transform:none!important}
+.mode-option.selected{background:var(--ui-accent-soft)!important;border-color:var(--ui-accent)!important;box-shadow:0 0 0 1px var(--ui-accent)!important}
+.mode-icon.aeo,.mode-icon.seo{background:var(--ui-muted)!important;color:var(--ui-accent)!important}
+.popup-site-input .website-field,.popup-notification-setting{background:var(--ui-panel)!important}
+.popup-actions>button:first-child{box-shadow:none!important}
+.popup-footer{margin-top:13px!important}

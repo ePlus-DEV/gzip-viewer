@@ -633,3 +633,41 @@ progress{height:10px;accent-color:#20b89b;border-radius:99px}
 :root[data-theme="dark"] .audit-sidebar-panel [aria-current="page"]{background:#162b49!important;border-color:#28496f!important}
 :root[data-theme="dark"] .mode-card:has(button[data-state="checked"]){background:color-mix(in srgb,var(--ui-accent) 10%,var(--ui-panel))!important}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .audit-sidebar-panel{background:#091426!important}}
+
+/* Sidebar interaction states: active stays active; hover never paints a light/disabled-looking pill. */
+.audit-sidebar-panel [data-slot="sidebar-menu"] a,
+.audit-sidebar-panel [data-slot="sidebar-menu"] button{
+  transition:background-color .16s ease,color .16s ease,border-color .16s ease!important;
+}
+.audit-sidebar-panel [data-slot="sidebar-menu"] a:not([aria-current="page"]):hover,
+.audit-sidebar-panel [data-slot="sidebar-menu"] button:not([aria-current="page"]):hover{
+  background:#142641!important;
+  border-color:#203a5f!important;
+  color:#eef5ff!important;
+}
+.audit-sidebar-panel [aria-current="page"],
+.audit-sidebar-panel [aria-current="page"]:hover{
+  background:#1b3152!important;
+  border-color:#29496f!important;
+  color:#fff!important;
+  box-shadow:inset 3px 0 0 #4f8cff!important;
+}
+.audit-sidebar-panel [aria-current="page"] svg,
+.audit-sidebar-panel [aria-current="page"]:hover svg{color:#78a8ff!important}
+
+/* Unified workspace shell */
+.audit-content{background:var(--ui-page)!important;padding:24px 28px 56px!important}
+.workspace-title{display:flex;align-items:end;justify-content:space-between;margin:0 0 18px}
+.workspace-title h1{margin:0;font-size:24px;line-height:1.15;letter-spacing:-.035em;font-weight:780}
+.workspace-title p{margin:5px 0 0;color:var(--ui-subtle);font-size:12px}
+.configuration-panel,.results-panel{background:var(--ui-panel)!important;border:1px solid var(--ui-border)!important;border-radius:12px!important;box-shadow:none!important}
+.configuration-panel{padding:20px!important}
+.panel-heading{gap:11px}.panel-heading .heading-icon{width:34px;height:34px;border-radius:9px;background:var(--ui-muted)!important;color:var(--ui-accent)!important}
+.panel-heading h2{font-size:14px!important}.panel-heading p{font-size:10px!important}
+.form-divider{margin:18px 0!important}
+.mode-card{min-height:82px!important}
+.mode-tags{font-size:9px!important}
+.audit-header{box-shadow:none!important;border-bottom:1px solid var(--ui-border)!important}
+.audit-header-actions .explore-nav{background:transparent!important;border:1px solid var(--ui-border)!important;color:var(--ui-text)!important}
+.audit-header-actions .explore-nav:hover{background:var(--ui-muted)!important}
+@media(max-width:760px){.audit-content{padding:18px 14px 44px!important}.workspace-title{margin-bottom:14px}}

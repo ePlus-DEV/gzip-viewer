@@ -2,6 +2,8 @@
 @source "../components/beui/**/*.{ts,tsx}";
 @source "../entrypoints/**/*.{ts,tsx}";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme inline {
   --color-primary: var(--ui-accent);
   --color-background: var(--ui-panel);
@@ -75,3 +77,10 @@
     outline-offset: 3px;
   }
 }
+
+.beui-theme-toggle{display:inline-flex;width:36px;height:36px;align-items:center;justify-content:center;border:1px solid var(--ui-border);border-radius:10px;background:var(--ui-panel);color:var(--ui-text);transition:background-color .18s,border-color .18s,color .18s}
+.beui-theme-toggle:hover{background:var(--ui-muted);border-color:color-mix(in srgb,var(--ui-accent) 35%,var(--ui-border))}
+.beui-theme-toggle>span{display:inline-flex;align-items:center;justify-content:center}
+::view-transition-old(root),::view-transition-new(root){animation:none;mix-blend-mode:normal}
+::view-transition-new(root){z-index:9999}
+::view-transition-old(root){z-index:1}
