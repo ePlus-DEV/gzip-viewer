@@ -17,6 +17,8 @@ import {
   AnimatedSidebarTrigger,
 } from '../../components/beui/animated-sidebar';
 import {LegacyBoundSelect, SelectField} from '../../components/SelectField';
+import {RadioGroup, RadioGroupItem} from '../../components/beui/radio';
+import {BouncyAccordion} from '../../components/beui/bouncy-accordion';
 import {initializeAuditRunner} from './logic';
 import {COMPLETION_NOTIFICATION_KEY} from '../../lib/audit-notifications';
 import {
@@ -30,8 +32,11 @@ import './style.css';
 function App() {
   const [notifyOnComplete, setNotifyOnComplete] = useState(false);
   const [preferenceError, setPreferenceError] = useState('');
-  const initialSite = new URLSearchParams(location.search).get('url') || '';
+  const params = new URLSearchParams(location.search);
+  const initialSite = params.get('url') || '';
+  const initialMode = params.get('mode') === 'seo' ? 'seo' : 'aeo';
   const [site, setSite] = useState(initialSite);
+  const [auditModeUi,setAuditModeUi] = useState<'aeo'|'seo'>(initialMode);
   const [startupError, setStartupError] = useState('');
   const [runState,setRunState] = useState({running:false,hasReport:false});
   const [validationConfig,setValidationConfig] = useState<AuditValidationConfig>(DEFAULT_AUDIT_CONFIG);
@@ -79,6 +84,28 @@ function App() {
   function resetValidationConfig(){
     setExpectedLanguagesText('');
     saveValidationConfig(DEFAULT_AUDIT_CONFIG);
+  }
+  useEffect(()=>{
+    const radios=Array.from(document.querySelectorAll<HTMLInputElement>(
+      '.beui-native-radio-bridge input[name="audit-mode"]',
+    ));
+    const sync=()=>{
+      const checked=radios.find(input=>input.checked)?.value;
+      if(checked==='aeo'||checked==='seo')setAuditModeUi(checked);
+    };
+    radios.forEach(input=>input.addEventListener('change',sync));
+    sync();
+    return ()=>radios.forEach(input=>input.removeEventListener('change',sync));
+  },[]);
+  function changeAuditMode(next:'aeo'|'seo'){
+    setAuditModeUi(next);
+    const input=document.querySelector<HTMLInputElement>(
+      '.beui-native-radio-bridge input[name="audit-mode"][value="'+next+'"]',
+    );
+    if(input){
+      input.checked=true;
+      input.dispatchEvent(new Event('change',{bubbles:true}));
+    }
   }
   useEffect(() => {
     try {initializeAuditRunner();}
@@ -195,27 +222,31 @@ function App() {
               <div><h2 id="mode-heading">Choose an audit</h2><p>Two specialized suites, one reporting workspace.</p></div>
               <span className="step-count">STEP 01</span>
             </div>
-            <fieldset id="audit-modes" className="mode-cards">
-              <legend className="sr-only">Audit mode</legend>
-              <label className="mode-card selected">
-                <input type="radio" name="audit-mode" value="aeo" defaultChecked/>
-                <span className="card-icon aeo"><Bot size={21}/></span>
-                <span className="mode-desc"><strong>AEO Audit</strong>
-                  <small>LLMS, agent instructions, product feed and multilingual data</small>
-                  <span className="mode-tags">llms.txt · agents.md · JSONL.GZ</span>
-                </span>
-                <span className="mode-check"><CheckCircle2 size={18}/></span>
-              </label>
-              <label className="mode-card">
-                <input type="radio" name="audit-mode" value="seo"/>
-                <span className="card-icon seo"><Search size={21}/></span>
-                <span className="mode-desc"><strong>SEO Audit</strong>
-                  <small>Technical indexing, sitemap health and product metadata</small>
-                  <span className="mode-tags">robots.txt · XML · JSON-LD</span>
-                </span>
-                <span className="mode-check"><CheckCircle2 size={18}/></span>
-              </label>
-            </fieldset>
+            <div id="audit-modes">
+              <div className="beui-native-radio-bridge" aria-hidden="true">
+                <input type="radio" name="audit-mode" value="aeo" defaultChecked={initialMode==='aeo'} tabIndex={-1}/>
+                <input type="radio" name="audit-mode" value="seo" defaultChecked={initialMode==='seo'} tabIndex={-1}/>
+              </div>
+              <RadioGroup value={auditModeUi} onValueChange={value=>changeAuditMode(value as 'aeo'|'seo')}
+                orientation="horizontal" className="mode-cards">
+                <RadioGroupItem value="aeo" className="mode-card"
+                  label={<>
+                    <span className="card-icon aeo"><Bot size={21}/></span>
+                    <span className="mode-desc"><strong>AEO Audit</strong>
+                      <small>LLMS, agent instructions, product feed and multilingual data</small>
+                      <span className="mode-tags">llms.txt · agents.md · JSONL.GZ</span>
+                    </span>
+                  </>}/>
+                <RadioGroupItem value="seo" className="mode-card"
+                  label={<>
+                    <span className="card-icon seo"><Search size={21}/></span>
+                    <span className="mode-desc"><strong>SEO Audit</strong>
+                      <small>Technical indexing, sitemap health and product metadata</small>
+                      <span className="mode-tags">robots.txt · XML · JSON-LD</span>
+                    </span>
+                  </>}/>
+              </RadioGroup>
+            </div>
             <p id="mode-description" className="mode-description">Start at llms.txt and cross-check linked feeds and localized products.</p>
 
             <div className="form-divider"/>
@@ -243,15 +274,22 @@ function App() {
                   {value:'0',label:'All published links'},
                 ]}/>
             </div>
-            <details className="checklist"><summary><FileCode2 size={16}/>
-              Checks in <span id="checklist-mode">AEO</span> mode</summary>
-              <ul id="mode-checks"/>
-            </details>
-            <details className="validation-config">
-              <summary><SlidersHorizontal size={16}/>
-                <span><strong>Validation settings</strong><small>Saved locally and included in exported reports.</small></span>
-              </summary>
-              <div className="validation-config-body">
+            <BouncyAccordion
+              items={[{
+                id:'checks',
+                icon:<FileCode2 size={16}/>,
+                title:<span>Checks in <span id="checklist-mode">AEO</span> mode</span>,
+                description:<ul id="mode-checks"/>,
+              }]}
+              className="checklist beui-accordion"
+              classNames={{item:'checklist-item',trigger:'checklist-trigger',description:'checklist-description'}}
+            />
+            <BouncyAccordion
+              items={[{
+                id:'validation',
+                icon:<SlidersHorizontal size={16}/>,
+                title:<span className="validation-accordion-title"><strong>Validation settings</strong><small>Saved locally and included in exported reports.</small></span>,
+                description:<div className="validation-config-body">
                 <div className="validation-config-head">
                   <div>
                     <strong>Policy overrides</strong>
@@ -334,8 +372,11 @@ function App() {
                   <p className="validation-help">Sitemap lastmod age is optional; 0 disables it. Expected languages are also used to validate hreflang coverage.</p>
                 </div>
                 {validationError && <p className="notification-setting-error" role="alert">{validationError}</p>}
-              </div>
-            </details>
+              </div>,
+              }]}
+              className="validation-config beui-accordion"
+              classNames={{item:'validation-accordion-item',trigger:'validation-accordion-trigger',description:'validation-accordion-description'}}
+            />
             <div className="run-toolbar">
               <Button id="run" size="lg" disabled={runState.running} className="rounded-xl audit-run"><Play size={16} fill="currentColor"/> Run Tests</Button>
               <Button id="stop" variant="outline" size="lg" className="rounded-xl" disabled={!runState.running}>
