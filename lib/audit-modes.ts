@@ -22,7 +22,10 @@ export const AUDIT_MODES: Record<AuditMode, ModeDefinition> = {
       'AEO-05 Cross-language shard count, SKU order and invariant data',
       'AEO-06 Sample product JSON, detail page and Product JSON-LD',
       'AEO-07 XML discovery links and URL availability',
-      'AEO-08 Database-to-feed coverage (requires authoritative SKU export)',
+      'AEO-08 Parts-compatibility index schema, file URLs, domains and make/page metadata',
+      'AEO-09 Parts-compatibility vehicle_count, total_models and nested fitment schema',
+      'AEO-10 compatible_skus coverage against the complete reference-language product feed',
+      'AEO-11 Database-to-feed coverage (requires authoritative SKU export)',
     ],
   },
   seo: {

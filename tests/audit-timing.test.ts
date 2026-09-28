@@ -17,6 +17,10 @@ describe('audit timing and navigation', () => {
       .toEqual({stage: 'aeo-shards', completed: null, total: null});
     expect(stageFromMessage('4/5 · Compared shard group 13 (13/25)'))
       .toEqual({stage: 'aeo-shards', completed: 13, total: 25});
+    expect(stageFromMessage('5/6 · Loading parts compatibility index…'))
+      .toEqual({stage: 'aeo-compatibility', completed: null, total: null});
+    expect(stageFromMessage('5/6 · Compatibility files: 2/8'))
+      .toEqual({stage: 'aeo-compatibility', completed: 2, total: 8});
     expect(stageFromMessage('SEO 2/4 · XML sitemaps: 2/100'))
       .toEqual({stage: 'seo-sitemaps', completed: 2, total: 100});
     expect(stageFromMessage('SEO 3/4 · Pages 13/15'))

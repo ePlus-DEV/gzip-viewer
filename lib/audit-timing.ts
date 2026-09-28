@@ -1,5 +1,5 @@
 /** UI-only estimates. Progress is based on completed, similarly-sized work units. */
-export type AuditStage = 'aeo-shards' | 'seo-sitemaps' | 'seo-pages';
+export type AuditStage = 'aeo-shards' | 'aeo-compatibility' | 'seo-sitemaps' | 'seo-pages';
 
 export interface StageProgress {
   stage: AuditStage;
@@ -23,6 +23,13 @@ export function stageFromMessage(message: string): StageProgress | null {
   if (/Compared shard group/i.test(message)) {
     const numbers = countAtEnd(message);
     return numbers ? {stage: 'aeo-shards', ...numbers} : null;
+  }
+  if (/Parts compatibility index/i.test(message)) {
+    return {stage: 'aeo-compatibility', completed: null, total: null};
+  }
+  if (/Compatibility files:/i.test(message)) {
+    const numbers = countAtEnd(message);
+    return numbers ? {stage: 'aeo-compatibility', ...numbers} : null;
   }
   if (/SEO 2\/4.*Crawling XML sitemap/i.test(message)) {
     return {stage: 'seo-sitemaps', completed: null, total: null};

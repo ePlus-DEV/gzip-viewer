@@ -4,6 +4,7 @@ import {mkdtemp, rm, mkdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
 import {chromium} from 'playwright';
+import {gzipSync} from 'node:zlib';
 
 const extension = resolve('.output/chrome-mv3');
 const sites = {origin: ''};
@@ -45,7 +46,9 @@ const body = (pathname) => {
   const item = {...product, url: origin + '/en/product/test-item'};
   switch (pathname) {
     case '/llms.txt':
-      return ['text/plain', '# Test Website\n## Product feeds\n- [Products](' + origin + '/feeds/products.json)\n'];
+      return ['text/plain', '# Test Website\n## Product feeds\n- [Products](' + origin +
+        '/feeds/products.json)\n- [Parts compatibility](' + origin +
+        '/feeds/parts-compatibility.json.gz)\n'];
     case '/agents.md':
       return ['text/markdown', '# Agents\n[Product feed](' + origin + '/feeds/products.json)\n'];
     case '/feeds/products.json':
@@ -58,6 +61,20 @@ const body = (pathname) => {
       })];
     case '/feeds/products-en-1.jsonl.gz':
       return ['application/x-ndjson', JSON.stringify(item)+'\n'];
+    case '/feeds/parts-compatibility.json.gz':
+      return ['application/gzip', gzipSync(JSON.stringify({
+        schema_version:'1.0', updated_at:changed, total_models:1,
+        files:[{url:origin+'/feeds/parts-compatibility-honda.json.gz',make:'HONDA',page:1}],
+      }))];
+    case '/feeds/parts-compatibility-honda.json.gz':
+      return ['application/gzip', gzipSync(JSON.stringify({
+        schema_version:'1.0', type:'parts-compatibility', manufacturer:'HONDA',
+        vehicle_count:1, page:1, updated_at:changed,
+        vehicles:[{
+          vehicle:{model_code:'286',make:'HONDA',model:'RVF750',engine_cc:750},
+          fitments:[{year_status:'unknown',fitment_info:'94-95',compatible_skus:['101']}],
+        }],
+      }))];
     case '/en/products/101.json':
       return ['application/json', JSON.stringify(item)];
     case '/robots.txt':
@@ -164,6 +181,13 @@ try {
   assert.equal(new URL(page.url()).searchParams.has('autorun'),false,
     'The one-shot launch flag must be consumed before the audit begins.');
   assert.equal(hits('/llms.txt'),1,'One popup click must start exactly one AEO scan.');
+  assert.equal(hits('/feeds/parts-compatibility.json.gz'),1,
+    'Quick AEO must load the published compatibility index once.');
+  assert.equal(hits('/feeds/parts-compatibility-honda.json.gz'),1,
+    'Quick AEO must decode and validate one manufacturer/page compatibility file.');
+  const compatibilityFindings=await page.locator('#findings .id').allTextContents();
+  assert.ok(compatibilityFindings.some(id=>id.startsWith('PCL-COMPAT-FILE-')),
+    'Compatibility validation findings must be visible in the live report.');
   const pass=Number(await page.locator('#passed').innerText());
   assert.ok(pass>=3,'AEO must execute real HTTP/data checks, not just display the UI.');
   assert.match(await page.locator('#elapsed').innerText(),/^\d\d:\d\d:\d\d$/,'Timing must show elapsed duration.');
@@ -202,6 +226,8 @@ try {
     undefined,{timeout:90000},
   );
   assert.equal(hits('/llms.txt'),2,'The manually triggered rerun must execute once.');
+  assert.equal(hits('/feeds/parts-compatibility-honda.json.gz'),2,
+    'Manual rerun must perform compatibility validation exactly once again.');
   console.log('Manual rerun smoke PASS: no refresh loop and Run remains functional.');
 
   // Select SEO in a fresh popup: the new SEO tab must start without another click.
@@ -257,6 +283,24 @@ try {
   assert.equal(hits('/robots.txt'),1,
     'Returning to the main dashboard must not launch another scan.');
   console.log('Explorer smoke PASS: icons align; Dashboard returns to the main screen.');
+
+  // The new parts compatibility index/shard structures must have dedicated explorer views.
+  const compatibilityViewer=await context.newPage();
+  await compatibilityViewer.goto('chrome-extension://'+id+'/viewer.html?url='+
+    encodeURIComponent(sites.origin+'/feeds/parts-compatibility.json.gz'),{waitUntil:'networkidle'});
+  await compatibilityViewer.waitForFunction(()=>
+    document.querySelector('#mode')?.textContent?.includes('PARTS COMPATIBILITY INDEX'));
+  assert.equal(await compatibilityViewer.locator('#summary .metric').count(),5,
+    'Compatibility index should expose dedicated summary metrics.');
+  assert.match(await compatibilityViewer.locator('#items').innerText(),/HONDA/);
+  assert.match(await compatibilityViewer.locator('#items').innerText(),/Explore shard/);
+  await compatibilityViewer.goto('chrome-extension://'+id+'/viewer.html?url='+
+    encodeURIComponent(sites.origin+'/feeds/parts-compatibility-honda.json.gz'),{waitUntil:'networkidle'});
+  await compatibilityViewer.waitForFunction(()=>
+    document.querySelector('#mode')?.textContent==='PARTS COMPATIBILITY');
+  assert.match(await compatibilityViewer.locator('#items').innerText(),/RVF750/);
+  assert.match(await compatibilityViewer.locator('#status').innerText(),/1 shown/);
+  console.log('Compatibility Explorer smoke PASS: v2 index and manufacturer shard render correctly.');
 
   // Run Tests from the Explorer is also one-click and uses the selected mode.
   await viewer.goto(viewerUrl,{waitUntil:'networkidle'});
