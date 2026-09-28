@@ -4,7 +4,7 @@ import {createRoot} from 'react-dom/client';
 import {Activity, ArrowUpRight, Bot, Download, FileCode2,
   Globe2, Layers2, Play, Search, ShieldCheck, Square, Sparkles,
   BellRing, Clock3, Hourglass, CalendarClock, SlidersHorizontal, RotateCcw,
-  PanelLeft, X} from 'lucide-react';
+  PanelLeft, X, Moon, Sun} from 'lucide-react';
 import {Button} from '../../components/beui/button';
 import {AnimatedBadge} from '../../components/beui/animated-badge';
 import {Input} from '../../components/beui/input';
@@ -44,6 +44,21 @@ function App() {
   const [expectedLanguagesText,setExpectedLanguagesText] = useState('');
   const [validationError,setValidationError] = useState('');
   const [validationOpen,setValidationOpen] = useState(false);
+  const [darkMode,setDarkMode] = useState(()=>document.documentElement.dataset.theme==='dark');
+  function toggleTheme(){
+    const next=!darkMode;
+    setDarkMode(next);
+    document.documentElement.dataset.theme=next?'dark':'light';
+    void browser.storage.local.set({theme:next?'dark':'light'});
+  }
+  useEffect(()=>{
+    void browser.storage.local.get('theme').then(saved=>{
+      if(saved.theme==='dark'||saved.theme==='light'){
+        document.documentElement.dataset.theme=saved.theme;
+        setDarkMode(saved.theme==='dark');
+      }
+    }).catch(()=>{});
+  },[]);
   useEffect(()=>{
     const handler=(event:Event)=> {
       const update=(event as CustomEvent<{running:boolean;hasReport:boolean}>).detail;
@@ -160,6 +175,7 @@ function App() {
           <span><strong>SEO <em>&amp;</em> AEO Auditor</strong><small>Website quality workspace</small></span>
         </div>
         <div className="audit-header-actions">
+          <Button type="button" variant="ghost" size="icon" aria-label={darkMode?"Use light mode":"Use dark mode"} onClick={toggleTheme}>{darkMode?<Sun size={17}/>:<Moon size={17}/>}</Button>
           <AnimatedBadge status="info" size="sm" showIcon={false}>LOCAL AUDIT</AnimatedBadge>
           <a id="browse" className="explore-nav" href="#" aria-label="Open resource explorer in the extension">
             <Layers2 size={16}/> Resource Explorer <ArrowUpRight size={14}/>
