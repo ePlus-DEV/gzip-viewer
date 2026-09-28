@@ -220,7 +220,8 @@ try {
   assert.equal(hits('/llms.txt'),1,'Refreshing the results tab must NOT rerun AEO.');
 
   // Validation settings are persisted and must materially change AEO findings.
-  await page.locator('.validation-config > summary').click();
+  await page.getByRole('button',{name:/Validation settings/i}).click();
+  await page.getByRole('dialog',{name:/SEO and AEO validation settings/i}).waitFor({state:'visible'});
   await page.locator('#expected-languages').fill('en, de');
   await page.locator('#expected-languages').blur();
   await page.waitForTimeout(100);
