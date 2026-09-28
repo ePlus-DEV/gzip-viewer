@@ -102,3 +102,31 @@ Choose AEO or SEO, select Quick or Full, enter a site URL, then press **Run Test
 The Resource Explorer has two separate navigation concepts: **Back / Home** move through the current document ancestry, while the always-available **Dashboard** button returns to the full-page audit setup. Dashboard preserves the selected AEO/SEO mode, test scope and original website where possible; it does not automatically launch an audit. **Run Tests** in the explorer is one-click and explicitly starts the selected audit. Opening a sitemap directly (with no ancestry) still allows navigation to the Dashboard.
 
 Shared input icons in the popup, audit dashboard, live-results search and Resource Explorer have reserved horizontal padding and consistent vertical centering at desktop/mobile widths. The Chromium smoke suite verifies actual rendered icon/text bounding boxes and end-to-end navigation, including direct sitemap links.
+
+
+## Parts compatibility v2
+
+The AEO suite understands the current two-level compatibility feed instead of treating it as one generic JSON file.
+
+Index example:
+
+```json
+{
+  "schema_version": "1.0",
+  "updated_at": "2026-09-28T04:08:05Z",
+  "total_models": 659,
+  "files": [
+    {
+      "url": "https://example.com/feeds/parts-compatibility-honda.json.gz",
+      "make": "HONDA",
+      "page": 1
+    }
+  ]
+}
+```
+
+Each listed GZIP JSON file is validated as a manufacturer/page shard with `type: "parts-compatibility"`, `manufacturer`, `vehicle_count`, `page`, `updated_at` and `vehicles`. Vehicles contain `vehicle.model_code`, `make`, `model`, `engine_cc` and fitments. Fitments validate `year_status`; known years require `year_start` / `year_end`, while `compatible_skus` references are collected for product-feed coverage.
+
+Quick mode validates the index plus one published manufacturer/page file and reports exhaustive model/SKU coverage as NOT RUN. Full mode loads every published compatibility file, verifies file domains, make/page metadata, `vehicle_count`, declared `total_models`, and checks every unique `compatible_skus` value against the complete reference-language product feed.
+
+The Resource Explorer has dedicated index and manufacturer-shard views with make/page navigation, vehicle/fitment metrics, SKU search and lazy fitment detail rendering. Examples use `example.com`; do not commit internal/staging feed hosts.
