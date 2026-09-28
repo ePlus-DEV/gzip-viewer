@@ -43,7 +43,7 @@ interface Report {
   completed: boolean;
 }
 export function initializeAuditRunner(): void {
-const required=['site','scope','reference','links','run','stop','export','browse','activity','progress',
+const required=['site','scope','reference','run','stop','export','browse','activity','progress',
   'findings','summary','notification-status','elapsed','remaining','finish-at','duration-label',
   'remaining-label','finish-label','timing-note','result-filter','result-sort','result-query','results-visible'];
 const missing=required.filter(id=>!document.getElementById(id));
@@ -57,7 +57,6 @@ const checklistModeEl = document.querySelector<HTMLElement>('#checklist-mode')!;
 const siteEl = document.querySelector<HTMLInputElement>('#site')!;
 const scopeEl = document.querySelector<HTMLSelectElement>('#scope')!;
 const referenceEl = document.querySelector<HTMLSelectElement>('#reference')!;
-const linksEl = document.querySelector<HTMLSelectElement>('#links')!;
 const runEl = document.querySelector<HTMLButtonElement>('#run')!;
 const stopEl = document.querySelector<HTMLButtonElement>('#stop')!;
 const exportEl = document.querySelector<HTMLButtonElement>('#export')!;
