@@ -458,9 +458,6 @@ function renderMode(): void {
     li.textContent = check;
     modeChecksEl.append(li);
   });
-  document.querySelectorAll('.mode-card').forEach(card =>
-    card.classList.toggle('selected',
-      card.querySelector<HTMLInputElement>('input')?.checked === true));
   document.querySelectorAll('.aeo-only').forEach(element =>
     element.classList.toggle('hidden', mode === 'seo'));
   document.querySelectorAll('.seo-only').forEach(element =>
@@ -1030,7 +1027,10 @@ if (scopeFromPopup === 'quick' || scopeFromPopup === 'full') {
 }
 if (params.get('mode') === 'seo') {
   const seo = modeInputs.find(input => input.value === 'seo');
-  if (seo) seo.checked = true;
+  if (seo) {
+    seo.checked = true;
+    seo.dispatchEvent(new Event('change',{bubbles:true}));
+  }
 }
 renderMode();
 
