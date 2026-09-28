@@ -240,3 +240,28 @@ progress{height:10px;accent-color:#20b89b;border-radius:99px}
 .audit-site-input .url-field > span:first-child,.results-search .results-search-field > span:first-child {
   left:13px;top:50%;
 }
+
+
+/* Persisted SEO/AEO validation policy controls. */
+.validation-config{margin:14px 0 20px;border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-panel);overflow:hidden}
+.validation-config>summary{display:flex;align-items:center;gap:9px;padding:13px 15px;cursor:pointer;list-style:none;font-size:12px;font-weight:750}
+.validation-config>summary::-webkit-details-marker{display:none}
+.validation-config>summary>span{display:flex;flex-direction:column;gap:2px}
+.validation-config>summary small{font-size:10px;font-weight:500;color:var(--ui-subtle)}
+.validation-config[open]>summary{border-bottom:1px solid var(--ui-border);background:color-mix(in srgb,var(--ui-accent) 4%,var(--ui-panel))}
+.validation-config-body{padding:15px}
+.validation-config-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.validation-config-head>div{display:flex;flex-direction:column;gap:3px}
+.validation-config-head strong{font-size:12px}
+.validation-config-head small,.validation-help{font-size:10px;color:var(--ui-subtle);line-height:1.5}
+.validation-reset{white-space:nowrap}
+.validation-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.shared-validation{grid-template-columns:minmax(0,1fr);margin-bottom:14px}
+.validation-mode-block{padding:14px;border:1px solid var(--ui-border);border-radius:11px;background:var(--ui-muted)}
+.validation-mode-block+.validation-mode-block{margin-top:12px}
+.validation-mode-title{display:flex;align-items:center;gap:7px;margin-bottom:12px;font-size:11px;font-weight:780;color:var(--ui-text)}
+.validation-select-label{display:block;font-size:11px;font-weight:680}
+.validation-select-label select{display:block;width:100%;height:44px;margin-top:7px;padding:9px 11px;border:1px solid var(--ui-border);border-radius:10px;background:var(--ui-panel);color:var(--ui-text);font-size:11px}
+.validation-help{margin:11px 1px 0}
+.validation-mode-block.hidden{display:none!important}
+@media(max-width:760px){.validation-grid{grid-template-columns:1fr}.validation-config-head{align-items:flex-start;flex-direction:column}.validation-reset{align-self:flex-start}}
