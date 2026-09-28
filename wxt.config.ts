@@ -6,7 +6,7 @@ export default defineConfig({
   vite: () => ({plugins: [tailwindcss()]}),
   manifest: {
     name: 'SEO & AEO Auditor',
-    version: '1.11.0',
+    version: '1.12.0',
     description: 'Configurable SEO/AEO audits for discovery, sitemaps, product feeds and compatibility data.',
     permissions: ['tabs','storage','notifications'],
     host_permissions: ['<all_urls>'],
