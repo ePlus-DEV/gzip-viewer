@@ -98,3 +98,31 @@ body{margin:0;background:var(--ui-page);color:var(--ui-text);font-size:13px;line
 #navigation #breadcrumbs > svg {flex:0 0 auto;width:15px;height:15px;}
 @media(max-width:1020px){.viewer-controls{align-items:center;flex-wrap:wrap;row-gap:9px;}}
 @media(max-width:600px){.viewer-controls .dashboard-link{order:1}.viewer-controls #runTests{order:1}}
+
+
+/* Visible display-limit control uses beUI Select; native bridge stays hidden. */
+.viewer-limit-select{
+  width:138px;
+  flex:0 0 auto;
+}
+.viewer-limit-select .beui-select-trigger{
+  min-height:36px;
+  height:36px;
+  border-radius:9px;
+  padding:8px 10px;
+  font-size:11px;
+  background:var(--ui-panel);
+  box-shadow:none;
+}
+.viewer-limit-select .beui-select-content{
+  z-index:80;
+  min-width:150px;
+  max-height:280px;
+  overflow-y:auto;
+}
+.viewer-controls .beui-native-select-bridge{
+  display:none!important;
+}
+@media(max-width:600px){
+  .viewer-limit-select{width:145px}
+}
