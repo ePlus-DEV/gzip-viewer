@@ -11,21 +11,29 @@ export interface SelectOption {
 
 interface SelectFieldProps {
   label?: string;
-  value: string;
+  value?: string;
+  defaultValue?: string;
   options: readonly SelectOption[];
-  onValueChange: (value: string) => void;
+  onValueChange?: (value: string) => void;
   placeholder?: string;
   className?: string;
   disabled?: boolean;
 }
 
 export function SelectField({
-  label,value,options,onValueChange,placeholder,className,disabled,
+  label,value,defaultValue,options,onValueChange,placeholder,className,disabled,
 }:SelectFieldProps){
+  const controlled=value!==undefined;
+  const [internal,setInternal]=useState(defaultValue??options[0]?.value??'');
+  const current=controlled ? (value??'') : internal;
+  const change=(next:string)=>{
+    if(!controlled)setInternal(next);
+    onValueChange?.(next);
+  };
   return (
     <div className={'beui-select-field '+(className??'')}>
       {label ? <span className="beui-select-label">{label}</span> : null}
-      <Select value={value} onValueChange={onValueChange} disabled={disabled}>
+      <Select value={current} onValueChange={change} disabled={disabled}>
         <SelectTrigger className="beui-select-trigger">
           <SelectValue placeholder={placeholder}/>
         </SelectTrigger>
