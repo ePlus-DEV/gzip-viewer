@@ -130,3 +130,30 @@ Each listed GZIP JSON file is validated as a manufacturer/page shard with `type:
 Quick mode validates the index plus one published manufacturer/page file and reports exhaustive model/SKU coverage as NOT RUN. Full mode loads every published compatibility file, verifies file domains, make/page metadata, `vehicle_count`, declared `total_models`, and checks every unique `compatible_skus` value against the complete reference-language product feed.
 
 The Resource Explorer has dedicated index and manufacturer-shard views with make/page navigation, vehicle/fitment metrics, SKU search and lazy fitment detail rendering. Examples use `example.com`; do not commit internal/staging feed hosts.
+
+
+## Configurable SEO / AEO validation
+
+Version 1.11 adds a **Validation settings** panel to the full audit dashboard. Settings are stored only in Chrome local extension storage and the exact normalized policy is embedded in every exported JSON report so a run can be reproduced later.
+
+Shared configuration:
+
+- **Expected languages** — optional comma-separated locale list such as `en, de, fr, it`. Leave it empty to infer languages from published discovery/feed data.
+- The settings panel is mode-aware: AEO and SEO policies are shown separately, while Reset restores safe generic defaults.
+
+AEO configuration:
+
+- **Feed freshness** in hours; the default is 24 hours and `0` disables the age check.
+- **Maximum records per product shard**; the default remains 50,000.
+- **GTIN policy**: eligible products only, every product, or disabled.
+- **Parts compatibility policy**: required, recommended, or disabled.
+- Configured expected languages become an explicit coverage contract; a missing feed language is a FAIL rather than an inferred warning.
+
+SEO configuration:
+
+- Independent **Quick** and **Full** page caps; defaults remain 15 and 500.
+- **Canonical**, **title + meta description**, **hreflang**, and **Product JSON-LD** each support Required (FAIL), Recommended (WARNING), or Disabled.
+- **Sitemap lastmod age** is an optional warning threshold in days; `0` disables age validation.
+- When expected languages are configured, hreflang sets are checked for those locales instead of only doing self-reference checks.
+
+The runner never upgrades skipped coverage to PASS. Disabling a rule suppresses that rule, while sampling and safety caps still produce NOT RUN where exhaustive evidence is unavailable.
