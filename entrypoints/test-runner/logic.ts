@@ -9,6 +9,10 @@ import {createFindingList} from './findings';
 import {isAuditComplete} from '../../lib/audit-results';
 import {pendingAutoRun} from '../../lib/audit-launch';
 import {
+  auditCompatibilityIndex, auditCompatibilityShard, compatibilityMetadataIssues,
+  type CompatibilityFile,
+} from '../../lib/parts-compatibility';
+import {
   buildCompletionNotification, COMPLETION_NOTIFICATION_KEY, COMPLETION_NOTIFICATION_PREFIX,
 } from '../../lib/audit-notifications';
 import {estimateStageRemainingMs, formatDuration, stageFromMessage, type AuditStage} from '../../lib/audit-timing';
@@ -473,7 +477,7 @@ async function runAeo(): Promise<void> {
   void browser.storage.local.set({lastUrl: llms.href});
 
   try {
-    step('1/5 · Discovering resources from llms.txt…', 3);
+    step('1/6 · Discovering resources from llms.txt…', 3);
     const llmsResponse = await fetchResponse(llms.href);
     if (!llmsResponse.ok || !checkRedirect(llmsResponse, entered, 'PCL-LLMS-DOMAIN')) {
       finding('PCL-LLMS', 'fail', 'llms.txt unavailable: HTTP ' + llmsResponse.status,
@@ -485,7 +489,7 @@ async function runAeo(): Promise<void> {
     const parsed = parseLlms(llmsText, llms.href);
     const agentsURL = new URL('/agents.md', entered.origin).href;
     try {
-      step('1/5 · Reading agents.md and resolving documented endpoints…', 9);
+      step('1/6 · Reading agents.md and resolving documented endpoints…', 9);
       const response = await fetchResponse(agentsURL);
       if (response.ok && checkRedirect(response, entered, 'PCL-AGENTS-DOMAIN')) {
         const body = await response.text();
@@ -539,13 +543,16 @@ async function runAeo(): Promise<void> {
     const concrete = [...new Set(discovered.map(link => resolveLink(link, llms.href)).filter(
       (url): url is string => typeof url === 'string'))];
     const limit = linkLimit ? concrete.slice(0, linkLimit) : concrete;
-    step('2/5 · Checking ' + limit.length + ' published links…', 15);
+    step('2/6 · Checking ' + limit.length + ' published links…', 15);
     for (const [i, url] of limit.entries()) {
       assertActive();
-      // Shards are fetched and parsed later; avoid downloading them twice.
-      if (/\.(?:jsonl|ndjson)\.gz$/i.test(new URL(url).pathname)) continue;
+      // Large product/compatibility resources are fetched and parsed later;
+      // avoid downloading them twice during the generic link pass.
+      const pathname = new URL(url).pathname;
+      if (/\.(?:jsonl|ndjson)\.gz$/i.test(pathname) ||
+          /\/feeds\/parts-compatibility\.json(?:\.gz)?$/i.test(pathname)) continue;
       await checkLink(url, 'PCL-LINK-' + (i + 1), entered);
-      step('2/5 · Checking published links ' + (i + 1) + '/' + limit.length,
+      step('2/6 · Checking published links ' + (i + 1) + '/' + limit.length,
         15 + 14 * (i + 1) / Math.max(1, limit.length));
     }
     if (limit.length < concrete.length) {
@@ -583,7 +590,7 @@ async function runAeo(): Promise<void> {
     if (sitemaps.length > (scope === 'quick' ? 1 : 5)) {
       finding('PCL-XML-SCOPE', 'not-run', 'Additional sitemaps excluded from this round.');
     }
-    step('3/5 · Loading product feed index…', 33);
+    step('3/6 · Loading product feed index…', 31);
     const feedURL = concrete.find(url => /\/feeds\/products\.json$/i.test(new URL(url).pathname));
     if (!feedURL) {
       finding('PCL-INDEX', 'blocked', 'No products.json link published in llms.txt.',
@@ -654,6 +661,8 @@ async function runAeo(): Promise<void> {
     }
     const selected = scope === 'quick' ? allGroups.filter(([, langs]) =>
       declaredLanguages.every(lang => langs.has(lang))).slice(0, 1) : allGroups;
+    const referenceProductSkus = new Set<string>();
+    let referenceFeedComplete = scope === 'full';
     if (scope === 'quick' && !selected.length) {
       finding('PCL-SHARDS', 'blocked', 'No common shard number across all declared languages.');
       return;
@@ -662,16 +671,24 @@ async function runAeo(): Promise<void> {
       finding('PCL-SCOPE', 'not-run', (allGroups.length - selected.length) +
         ' shard groups excluded by Quick mode. Choose Full to test all published groups.');
     }
-    step('4/5 · Loading and comparing ' + selected.length + ' shard group(s)…', 40);
+    step('4/6 · Loading and comparing ' + selected.length + ' shard group(s)…', 38);
     for (const [idx, [number, byLanguage]] of selected.entries()) {
       assertActive();
       const referenceURL = byLanguage.get(reference);
       if (!referenceURL) {
+        referenceFeedComplete = false;
         finding('PCL-REF-' + number, 'blocked', 'Reference language shard missing: ' + reference + '-' + number);
         continue;
       }
       const base = await fetchShard(referenceURL, 'PCL-SHARD-' + reference + '-' + number, entered);
-      if (!base) continue;
+      if (!base) {
+        referenceFeedComplete = false;
+        continue;
+      }
+      for (const record of base.records) {
+        const sku = String(record.sku ?? '').trim();
+        if (sku) referenceProductSkus.add(sku);
+      }
       await checkSamples(base, referenceURL, reference, 'PCL-PRODUCT-' + reference + '-' + number, entered);
       for (const [lang, url] of byLanguage.entries()) {
         assertActive();
@@ -691,17 +708,153 @@ async function runAeo(): Promise<void> {
           diff.examples.slice(0, 10).join(' | '), url);
         await checkSamples(localized, url, lang, 'PCL-PRODUCT-' + lang + '-' + number, entered);
       }
-      step('4/5 · Compared shard group ' + number +
+      step('4/6 · Compared shard group ' + number +
         ' (' + (idx + 1) + '/' + selected.length + ')',
-        40 + 55 * (idx + 1) / selected.length);
+        38 + 42 * (idx + 1) / selected.length);
     }
+    step('5/6 · Loading parts compatibility index…', 82);
+    const compatibilityURL = concrete.find(url =>
+      /\/feeds\/parts-compatibility\.json(?:\.gz)?$/i.test(new URL(url).pathname));
+    if (!compatibilityURL) {
+      finding('PCL-COMPAT-INDEX', 'blocked',
+        'No parts-compatibility.json.gz index is published in llms.txt.',
+        'Publish the compatibility index so file/domain/schema/SKU coverage can be tested.', llms.href);
+    } else {
+      let compatibilityIndexComplete = false;
+      const compatibilitySkus = new Set<string>();
+      let actualModels = 0;
+      let parsedCompatibilityFiles = 0;
+      try {
+        const response = await fetchResponse(compatibilityURL);
+        const domainOK = checkRedirect(response, entered, 'PCL-COMPAT-INDEX-DOMAIN');
+        if (!response.ok || !domainOK) {
+          finding('PCL-COMPAT-INDEX', 'fail',
+            'Parts compatibility index HTTP ' + response.status, response.url, compatibilityURL);
+          if (response.body) await response.body.cancel();
+        } else {
+          const rawIndex: unknown = JSON.parse(await responseText(response));
+          const compatibilityIndex = auditCompatibilityIndex(rawIndex, compatibilityURL);
+          const indexErrors = compatibilityIndex.issues.filter(issue => issue.severity === 'error');
+          finding('PCL-COMPAT-INDEX', indexErrors.length ? 'fail' :
+            compatibilityIndex.issues.length ? 'warning' : 'pass',
+            'Compatibility index: ' + compatibilityIndex.files.length +
+              ' manufacturer/page file(s), ' +
+              (compatibilityIndex.totalModels?.toLocaleString() ?? '—') + ' declared models',
+            compatibilityIndex.issues.slice(0, 12).map(issue => issue.message).join(' | '),
+            compatibilityURL);
+
+          const wrongCompatibilityHosts = compatibilityIndex.files.filter(file =>
+            new URL(file.url).hostname !== entered.hostname);
+          finding('PCL-COMPAT-DOMAIN', wrongCompatibilityHosts.length ? 'fail' : 'pass',
+            'Compatibility file domains: ' + wrongCompatibilityHosts.length + ' unexpected hosts',
+            wrongCompatibilityHosts.slice(0, 8).map(file => file.url).join(' | '),
+            compatibilityURL);
+
+          const files: CompatibilityFile[] = scope === 'quick'
+            ? compatibilityIndex.files.slice(0, 1)
+            : compatibilityIndex.files;
+          if (scope === 'quick' && compatibilityIndex.files.length > files.length) {
+            finding('PCL-COMPAT-SCOPE', 'not-run',
+              (compatibilityIndex.files.length - files.length) +
+                ' compatibility file(s) excluded by Quick mode.',
+              'Choose Full audit to verify every make/page file and total_models.');
+          }
+
+          compatibilityIndexComplete =
+            scope === 'full' &&
+            files.length === compatibilityIndex.files.length &&
+            indexErrors.length === 0 &&
+            wrongCompatibilityHosts.length === 0;
+
+          for (const [fileIndex, file] of files.entries()) {
+            assertActive();
+            const id = 'PCL-COMPAT-FILE-' + (fileIndex + 1);
+            step('5/6 · Compatibility files: ' + (fileIndex + 1) + '/' + files.length,
+              82 + 15 * (fileIndex + 1) / Math.max(1, files.length));
+            try {
+              const shardResponse = await fetchResponse(file.url);
+              const shardDomainOK = checkRedirect(shardResponse, entered, id + '-DOMAIN');
+              finding(id + '-HTTP', shardResponse.ok && shardDomainOK ? 'pass' : 'fail',
+                file.make + ' page ' + file.page + ': HTTP ' + shardResponse.status,
+                shardResponse.url, file.url);
+              if (!shardResponse.ok || !shardDomainOK) {
+                compatibilityIndexComplete = false;
+                if (shardResponse.body) await shardResponse.body.cancel();
+                continue;
+              }
+
+              const rawShard: unknown = JSON.parse(await responseText(shardResponse));
+              const shard = auditCompatibilityShard(rawShard);
+              const metadataIssues = compatibilityMetadataIssues(shard, file);
+              const shardIssues = [...shard.issues, ...metadataIssues];
+              const shardErrors = shardIssues.filter(issue => issue.severity === 'error');
+              finding(id + '-SCHEMA', shardErrors.length ? 'fail' :
+                shardIssues.length ? 'warning' : 'pass',
+                file.make + ' page ' + file.page + ': ' +
+                  shard.vehicles.length.toLocaleString() + ' vehicles · ' +
+                  shard.fitmentCount.toLocaleString() + ' fitments',
+                shardIssues.slice(0, 12).map(issue => issue.message).join(' | '), file.url);
+              finding(id + '-COUNT',
+                shard.vehicleCount === shard.vehicles.length ? 'pass' : 'fail',
+                'vehicle_count: ' + (shard.vehicleCount ?? 'invalid') +
+                  ' · actual vehicles: ' + shard.vehicles.length,
+                undefined, file.url);
+              if (metadataIssues.length || shardErrors.length) compatibilityIndexComplete = false;
+              actualModels += shard.vehicles.length;
+              parsedCompatibilityFiles++;
+              for (const sku of shard.uniqueCompatibleSkus) compatibilitySkus.add(sku);
+            } catch (error) {
+              compatibilityIndexComplete = false;
+              finding(id + '-PARSE', 'fail',
+                'Compatibility file download, GZIP decoding or JSON parsing failed',
+                error instanceof Error ? error.message : String(error), file.url);
+            }
+          }
+
+          if (scope === 'full' && compatibilityIndexComplete) {
+            const totalMatches = compatibilityIndex.totalModels === actualModels;
+            finding('PCL-COMPAT-TOTAL-MODELS', totalMatches ? 'pass' : 'fail',
+              'total_models: ' + (compatibilityIndex.totalModels ?? 'invalid') +
+                ' · actual vehicles across files: ' + actualModels,
+              undefined, compatibilityURL);
+          } else {
+            finding('PCL-COMPAT-TOTAL-MODELS', 'not-run',
+              'Exhaustive total_models verification requires every compatibility file to parse successfully.',
+              'Parsed ' + parsedCompatibilityFiles + ' compatibility file(s) in this run.',
+              compatibilityURL);
+          }
+
+          if (scope === 'full' && compatibilityIndexComplete && referenceFeedComplete) {
+            const missing = [...compatibilitySkus].filter(sku => !referenceProductSkus.has(sku));
+            finding('PCL-COMPAT-SKU-COVERAGE', missing.length ? 'fail' : 'pass',
+              compatibilitySkus.size.toLocaleString() +
+                ' unique compatibility SKU(s) checked against the complete ' + reference + ' product feed',
+              missing.length
+                ? missing.length.toLocaleString() + ' SKU(s) missing from product feed. Examples: ' +
+                  missing.slice(0, 20).join(', ')
+                : 'Every compatible_skus reference exists in the reference-language product feed.',
+              compatibilityURL);
+          } else {
+            finding('PCL-COMPAT-SKU-COVERAGE', 'not-run',
+              'Exhaustive compatible_skus ↔ product-feed coverage requires Full mode and complete files.',
+              'Quick mode or a failed/missing product/compatibility shard cannot prove absence.',
+              compatibilityURL);
+          }
+        }
+      } catch (error) {
+        finding('PCL-COMPAT-INDEX', 'fail',
+          'Parts compatibility index download, GZIP decoding or JSON parsing failed',
+          error instanceof Error ? error.message : String(error), compatibilityURL);
+      }
+    }
+
     finding('PCL-COVERAGE', 'not-run',
       'Entire source DB ↔ feed coverage cannot be proven from public feeds alone.',
       'This run samples product endpoints; connect an authoritative SKU export for exhaustive validation.');
     finding('PCL-PCL-MATRIX', 'not-run',
       'This runner is not a full execution of every requirement/PCL in the external workbook.',
       'It covers the linked-feed test groups shown in the result list.');
-    step('5/5 · Finished. Review results or export report.', 100);
+    step('6/6 · Finished. Review results or export report.', 100);
     report!.completed=true;
   } catch (error) {
     if (controller?.signal.aborted) {
