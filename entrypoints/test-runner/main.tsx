@@ -4,7 +4,7 @@ import {createRoot} from 'react-dom/client';
 import {Activity, ArrowUpRight, Bot, Download, FileCode2,
   Globe2, Layers2, Play, Search, ShieldCheck, Square, Sparkles,
   BellRing, Clock3, Hourglass, CalendarClock, SlidersHorizontal, RotateCcw,
-  PanelLeft, X} from 'lucide-react';
+  PanelLeft, X, Moon, Sun} from 'lucide-react';
 import {Button} from '../../components/beui/button';
 import {AnimatedBadge} from '../../components/beui/animated-badge';
 import {Input} from '../../components/beui/input';
@@ -44,6 +44,21 @@ function App() {
   const [expectedLanguagesText,setExpectedLanguagesText] = useState('');
   const [validationError,setValidationError] = useState('');
   const [validationOpen,setValidationOpen] = useState(false);
+  const [darkMode,setDarkMode] = useState(()=>document.documentElement.dataset.theme==='dark');
+  function toggleTheme(){
+    const next=!darkMode;
+    setDarkMode(next);
+    document.documentElement.dataset.theme=next?'dark':'light';
+    void browser.storage.local.set({theme:next?'dark':'light'});
+  }
+  useEffect(()=>{
+    void browser.storage.local.get('theme').then(saved=>{
+      if(saved.theme==='dark'||saved.theme==='light'){
+        document.documentElement.dataset.theme=saved.theme;
+        setDarkMode(saved.theme==='dark');
+      }
+    }).catch(()=>{});
+  },[]);
   useEffect(()=>{
     const handler=(event:Event)=> {
       const update=(event as CustomEvent<{running:boolean;hasReport:boolean}>).detail;
@@ -160,6 +175,7 @@ function App() {
           <span><strong>SEO <em>&amp;</em> AEO Auditor</strong><small>Website quality workspace</small></span>
         </div>
         <div className="audit-header-actions">
+          <Button type="button" variant="ghost" size="icon" aria-label={darkMode?"Use light mode":"Use dark mode"} onClick={toggleTheme}>{darkMode?<Sun size={17}/>:<Moon size={17}/>}</Button>
           <AnimatedBadge status="info" size="sm" showIcon={false}>LOCAL AUDIT</AnimatedBadge>
           <a id="browse" className="explore-nav" href="#" aria-label="Open resource explorer in the extension">
             <Layers2 size={16}/> Resource Explorer <ArrowUpRight size={14}/>
@@ -419,27 +435,17 @@ function App() {
 
           <section className="panel results-panel" id="result" aria-label="Audit results" aria-live="polite">
             <div className="panel-heading result-header"><div className="heading-icon"><Activity size={19}/></div>
-              <div><h2>Audit results <small id="summary"/></h2>
-                <p>Every finding shows what was checked and where.</p>
-              </div><span className="live-pill">LIVE</span>
+              <div><h2>Audit results <small id="summary"/></h2></div>
+              <span className="live-pill">LIVE</span>
             </div>
             <progress id="progress" max="100" value="0"/>
             <p id="activity">Ready. Choose a mode and press Run Tests.</p>
-            <div className="time-metrics" role="group" aria-label="Audit timing">
-              <div className="time-metric">
-                <span className="time-caption"><Clock3 size={16}/><span id="duration-label">Time elapsed</span></span>
-                <strong id="elapsed" className="time-value">00:00:00</strong>
-              </div>
-              <div className="time-metric">
-                <span className="time-caption"><Hourglass size={16}/><span id="remaining-label">Estimated remaining</span></span>
-                <strong id="remaining" className="time-value">Not started</strong>
-              </div>
-              <div className="time-metric">
-                <span className="time-caption"><CalendarClock size={16}/><span id="finish-label">Expected finish</span></span>
-                <strong id="finish-at" className="time-value">—</strong>
-              </div>
+            <div className="run-meta" role="group" aria-label="Audit timing">
+              <span><Clock3 size={14}/><span id="duration-label">Elapsed</span> <strong id="elapsed">00:00:00</strong></span>
+              <span><Hourglass size={14}/><span id="remaining-label">Remaining</span> <strong id="remaining">—</strong></span>
+              <span><CalendarClock size={14}/><span id="finish-label">Finish</span> <strong id="finish-at">—</strong></span>
             </div>
-            <p id="timing-note" className="timing-note">ETA appears after two comparable units.</p>
+            <p id="timing-note" className="timing-note sr-only">ETA appears after two comparable units.</p>
             <div className="totals">
               <div className="stat passed"><strong id="passed">0</strong><span>PASS</span></div>
               <div className="stat failed"><strong id="failed">0</strong><span>FAIL</span></div>
@@ -449,8 +455,7 @@ function App() {
             </div>
             <div className="results-toolbar">
               <div className="results-toolbar-heading">
-                <strong>Live findings</strong>
-                <span id="results-visible">0 matching checks</span>
+                <strong>Findings <span id="results-visible">0 matching checks</span></strong>
               </div>
               <div className="results-toolbar-actions">
                 <LegacyBoundSelect id="result-filter" defaultValue="all"
