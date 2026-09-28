@@ -218,6 +218,7 @@ export function SelectTrigger({ className, children, ariaLabel }: SelectTriggerP
       id={ctx.triggerId}
       disabled={ctx.disabled}
       aria-haspopup="listbox"
+      aria-label={ariaLabel}
       aria-expanded={ctx.open}
       aria-controls={ctx.listId}
       onClick={() => ctx.setOpen(!ctx.open)}
