@@ -250,7 +250,9 @@ try {
   await page.getByRole('radio',{name:/SEO Audit/i}).click();
   await page.getByRole('button',{name:/Validation settings/i}).click();
   await page.getByRole('dialog',{name:/SEO and AEO validation settings/i}).waitFor({state:'visible'});
-  await page.locator('#seo-meta').selectOption('required',{force:true});
+  const seoMetaField=page.locator('[data-control-id="seo-meta"]');
+  await seoMetaField.getByRole('button',{name:'Title + meta description'}).click();
+  await seoMetaField.getByRole('option',{name:'Required → FAIL'}).click();
   await page.getByRole('button',{name:'Close',exact:true}).click();
   await page.getByRole('dialog',{name:/SEO and AEO validation settings/i}).waitFor({state:'hidden'});
   await page.waitForTimeout(100);
