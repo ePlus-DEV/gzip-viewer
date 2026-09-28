@@ -24,7 +24,7 @@ function Explorer() {
           <Input id="search" type="search" placeholder="Search records, URLs or shards…"
             aria-label="Search resources" leftIcon={<Search size={17}/>}
             className="viewer-search" classNames={{field:"search-field",input:"viewer-search-input"}}/>
-          <LegacyBoundSelect id="limit" defaultValue="500" ariaLabel="Result display limit"
+          <LegacyBoundSelect id="limit" controlId="viewer-limit" defaultValue="500" ariaLabel="Result display limit"
             className="viewer-limit-select"
             options={[
               {value:'100',label:'100 results'},
