@@ -2,9 +2,11 @@ import {useEffect, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {browser} from 'wxt/browser';
 import {ArrowRight, ArrowUpRight, Bot, CheckCircle2, ChevronDown, Database, FileJson2,
-  Globe2, History, Layers2, Play, Radar, Search, ShieldCheck, Sparkles, BellRing} from 'lucide-react';
+  Globe2, History, Layers2, Play, Search, ShieldCheck, BellRing} from 'lucide-react';
 import {Button} from '../../components/beui/button';
 import {AnimatedBadge} from '../../components/beui/animated-badge';
+import {ThemeToggle} from '../../components/beui/theme-toggle';
+import {useTheme} from '../../components/beui/use-theme';
 import {Input} from '../../components/beui/input';
 import {Switch} from '../../components/beui/switch';
 import {httpUrl} from '../../lib/feed';
@@ -23,6 +25,7 @@ function App() {
   const [error, setError] = useState('');
   const [advanced, setAdvanced] = useState(false);
   const [notifyOnComplete, setNotifyOnComplete] = useState(false);
+  const {theme,changeTheme}=useTheme();
 
   useEffect(() => {
     let alive = true;
@@ -96,17 +99,13 @@ function App() {
           <div className="brand-symbol"><img src="/icon-48.png" width={40} height={40} alt=""/></div>
           <div><strong>SEO <span>&amp;</span> AEO Auditor</strong><small>Website quality workspace</small></div>
         </div>
-        <AnimatedBadge status="info" size="sm" showIcon={false}>v1.12.0</AnimatedBadge>
+        <div className="popup-top-actions"><ThemeToggle theme={theme} onThemeChange={changeTheme}/><AnimatedBadge status="neutral" size="sm" showIcon={false}>v1.12.0</AnimatedBadge></div>
       </header>
 
-      <section className="popup-hero">
-        <div className="hero-eyebrow"><Sparkles size={13}/> PERFORMANCE &amp; DISCOVERY</div>
-        <h1>Your audit. <span>One workspace.</span></h1>
-        <p>Inspect discovery files, trace product data and ship trustworthy search experiences.</p>
-      </section>
+      <div className="popup-intro"><strong>Start an audit</strong><span>Choose a mode, confirm the target, then run.</span></div>
 
       <section className="popup-section">
-        <div className="section-caption"><span>Choose your audit</span><span>01 / 03</span></div>
+        <div className="section-caption"><span>Choose your audit</span></div>
         <div className="mode-options" role="radiogroup" aria-label="Audit mode">
           {(['aeo','seo'] as const).map(value => {
             const SelectedIcon = value === 'aeo' ? Bot : Search;
@@ -126,7 +125,7 @@ function App() {
       </section>
 
       <section className="popup-section">
-        <div className="section-caption"><label htmlFor="site">Audit entry point</label><span>02 / 03</span></div>
+        <div className="section-caption"><label htmlFor="site">Audit entry point</label></div>
         <Input id="site" type="url" inputMode="url" autoComplete="url" value={site}
           onChange={setSite} onBlur={() => setSite(current => normalizeTarget(current))}
           placeholder={mode === 'aeo' ? 'https://example.com/llms.txt' : 'https://example.com/robots.txt'}
@@ -144,7 +143,7 @@ function App() {
       </section>
 
       <section className="popup-section">
-        <div className="section-caption"><span>Test coverage</span><span>03 / 03</span></div>
+        <div className="section-caption"><span>Test coverage</span></div>
         <div className="scope-segments" role="radiogroup" aria-label="Test coverage">
           <Button type="button" variant="ghost" size="sm" role="radio" aria-checked={scope === 'quick'}
             className={scope === 'quick' ? 'selected' : ''} onClick={() => setScope('quick')}>
