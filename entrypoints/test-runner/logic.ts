@@ -123,7 +123,8 @@ function updateClock(): void {
   }
   remainingEl.textContent = '≈ ' + formatDuration(remaining);
   finishEl.textContent = displayLocalTime(now + remaining);
-  const stage = clockStage.name === 'aeo-shards' ? 'shard comparison' : 'page checks';
+  const stage = clockStage.name === 'aeo-shards' ? 'product shard comparison' :
+    clockStage.name === 'aeo-compatibility' ? 'compatibility file validation' : 'page checks';
   timingNoteEl.textContent = 'Approximate finish for the current ' + stage +
     ' stage only; later processing and network delays can change it.';
 }
