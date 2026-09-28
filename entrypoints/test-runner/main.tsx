@@ -390,7 +390,6 @@ function App() {
               </div>
               </div>
             </Drawer>
-            />
             <div className="run-toolbar">
               <Button id="run" size="lg" disabled={runState.running} className="rounded-xl audit-run"><Play size={16} fill="currentColor"/> Run Tests</Button>
               <Button id="stop" variant="outline" size="lg" className="rounded-xl" disabled={!runState.running}>
