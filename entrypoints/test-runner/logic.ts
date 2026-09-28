@@ -69,11 +69,14 @@ const summaryEl = document.querySelector<HTMLElement>('#summary')!;
 const sidebarBrowseEl=document.querySelector<HTMLAnchorElement>('#sidebar-browse');
 const notificationStatusEl = document.querySelector<HTMLElement>('#notification-status')!;
 let activeValidationConfig: AuditValidationConfig = DEFAULT_AUDIT_CONFIG;
+let hasLiveValidationConfig=false;
 window.addEventListener(AUDIT_CONFIG_EVENT, event => {
   const detail=(event as CustomEvent<unknown>).detail;
   activeValidationConfig=normalizeAuditConfig(detail);
+  hasLiveValidationConfig=true;
 });
 async function validationConfigForRun(): Promise<AuditValidationConfig> {
+  if (hasLiveValidationConfig) return normalizeAuditConfig(activeValidationConfig);
   try {
     const stored=await browser.storage.local.get(AUDIT_CONFIG_STORAGE_KEY);
     activeValidationConfig=normalizeAuditConfig(stored[AUDIT_CONFIG_STORAGE_KEY]);
