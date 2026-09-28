@@ -2,7 +2,7 @@ import {browser} from 'wxt/browser';
 import {auditFeedIndex, httpUrl, isRecord, productJsonUrl} from '../../lib/feed';
 import {parseLlms, resolveLink} from '../../lib/discovery';
 import {parseSitemap} from '../../lib/sitemap';
-import {responseText} from '../../lib/decompress';
+import {responseText, streamTextLines} from '../../lib/decompress';
 import {AUDIT_MODES, type AuditMode} from '../../lib/audit-modes';
 import {runSeoAudit} from './seo';
 import {createFindingList} from './findings';
@@ -349,8 +349,33 @@ async function fetchShard(url: string, id: string, expected: URL): Promise<Shard
       if (response.body) await response.body.cancel();
       return null;
     }
-    const text = await responseText(response);
-    const data = parseShard(text, 20, activeValidationConfig.aeo.gtinPolicy);
+    const records:ShardRecord[]=[];
+    const issues:string[]=[];
+    let parsed=0,malformed=0;
+    await streamTextLines(response,async(line,lineNumber)=>{
+      assertActive();
+      if(!line.trim())return;
+      parsed++;
+      try{
+        const value:unknown=JSON.parse(line);
+        if(!isRecord(value)){
+          malformed++;
+          if(issues.length<20)issues.push('Line '+lineNumber+': expected JSON object.');
+          return;
+        }
+        records.push(value);
+        const eligible=value.is_eligible_search===true||value.is_eligible_checkout===true;
+        const policy=activeValidationConfig.aeo.gtinPolicy;
+        const requireGtin=policy==='all'||(policy==='eligible'&&eligible);
+        if(requireGtin&&!value.gtin&&issues.length<20){
+          issues.push('Line '+lineNumber+': GTIN missing under the selected GTIN validation policy.');
+        }
+      }catch(error){
+        malformed++;
+        if(issues.length<20)issues.push('Line '+lineNumber+': '+(error instanceof Error?error.message:String(error)));
+      }
+    });
+    const data:ShardData={records,parsed,malformed,issues};
     report!.checkedShards++;
     finding(id, data.malformed ? 'fail' : 'pass',
       'Shard parsed: ' + data.records.length.toLocaleString() + ' JSON records',
