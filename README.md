@@ -157,3 +157,17 @@ SEO configuration:
 - When expected languages are configured, hreflang sets are checked for those locales instead of only doing self-reference checks.
 
 The runner never upgrades skipped coverage to PASS. Disabling a rule suppresses that rule, while sampling and safety caps still produce NOT RUN where exhaustive evidence is unavailable.
+
+
+## UI component consistency (v1.12)
+
+All visible form/navigation controls now use the locally vendored motion component set rather than browser-native selects or a hand-built workspace rail:
+
+- animated Select for audit scope, reference language, link limits, result filter/sort, Explorer result limit, validation policy choices, and dynamic URL-template language fields;
+- Animated Sidebar for the dashboard workspace navigation, including desktop icon collapse and mobile sheet behavior;
+- Radio Group for the AEO/SEO suite selector;
+- Bouncy Accordion for the audit checklist;
+- Drawer for validation settings, so policy selects remain usable without being clipped by accordion overflow;
+- existing Button, Input, Switch and Animated Badge primitives remain in use.
+
+Hidden native select/radio elements exist only as compatibility bridges for the existing DOM audit engine. They are not rendered as user-facing controls. Component attribution remains in THIRD_PARTY_LICENSES.md and no library branding is displayed in the extension UI.
