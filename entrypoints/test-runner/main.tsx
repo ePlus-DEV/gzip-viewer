@@ -4,8 +4,9 @@ import {createRoot} from 'react-dom/client';
 import {Activity, ArrowUpRight, Bot, Download, FileCode2,
   Globe2, Layers2, Play, Search, ShieldCheck, Square, Sparkles,
   BellRing, Clock3, Hourglass, CalendarClock, SlidersHorizontal, RotateCcw,
-  PanelLeft, X, Moon, Sun} from 'lucide-react';
+  PanelLeft, X} from 'lucide-react';
 import {Button} from '../../components/beui/button';
+import {ThemeToggle, type ThemeMode} from '../../components/beui/theme-toggle';
 import {AnimatedBadge} from '../../components/beui/animated-badge';
 import {Input} from '../../components/beui/input';
 import {Switch} from '../../components/beui/switch';
@@ -44,19 +45,20 @@ function App() {
   const [expectedLanguagesText,setExpectedLanguagesText] = useState('');
   const [validationError,setValidationError] = useState('');
   const [validationOpen,setValidationOpen] = useState(false);
-  const [darkMode,setDarkMode] = useState(()=>document.documentElement.dataset.theme==='dark');
-  function toggleTheme(){
-    const next=!darkMode;
-    setDarkMode(next);
-    document.documentElement.dataset.theme=next?'dark':'light';
-    void browser.storage.local.set({theme:next?'dark':'light'});
-  }
+  const [theme,setTheme] = useState<ThemeMode>(()=>document.documentElement.dataset.theme==='dark'?'dark':'light');
+  const applyTheme=(next:ThemeMode)=>{
+    setTheme(next);
+    document.documentElement.dataset.theme=next;
+    document.documentElement.classList.toggle('dark',next==='dark');
+    void browser.storage.local.set({theme:next});
+  };
   useEffect(()=>{
     void browser.storage.local.get('theme').then(saved=>{
-      if(saved.theme==='dark'||saved.theme==='light'){
-        document.documentElement.dataset.theme=saved.theme;
-        setDarkMode(saved.theme==='dark');
-      }
+      const stored=saved.theme==='dark'||saved.theme==='light'?saved.theme:null;
+      const next:ThemeMode=stored??(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+      setTheme(next);
+      document.documentElement.dataset.theme=next;
+      document.documentElement.classList.toggle('dark',next==='dark');
     }).catch(()=>{});
   },[]);
   useEffect(()=>{
@@ -175,7 +177,7 @@ function App() {
           <span><strong>SEO <em>&amp;</em> AEO Auditor</strong><small>Website quality workspace</small></span>
         </div>
         <div className="audit-header-actions">
-          <Button type="button" variant="ghost" size="icon" aria-label={darkMode?"Use light mode":"Use dark mode"} onClick={toggleTheme}>{darkMode?<Sun size={17}/>:<Moon size={17}/>}</Button>
+          <ThemeToggle theme={theme} onThemeChange={applyTheme}/>
           <AnimatedBadge status="info" size="sm" showIcon={false}>LOCAL AUDIT</AnimatedBadge>
           <a id="browse" className="explore-nav" href="#" aria-label="Open resource explorer in the extension">
             <Layers2 size={16}/> Resource Explorer <ArrowUpRight size={14}/>
