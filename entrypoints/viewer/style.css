@@ -129,3 +129,22 @@ body{margin:0;background:var(--ui-page);color:var(--ui-text);font-size:13px;line
 @media(max-width:600px){
   .viewer-limit-select{width:145px}
 }
+
+/* Unified resource workspace */
+.viewer-header{padding:11px 18px!important;background:var(--ui-panel)!important;backdrop-filter:none!important;box-shadow:none!important}
+.viewer-controls{gap:7px!important}
+#navigation{padding:7px 18px!important}
+#explorer{grid-template-columns:240px minmax(0,1fr)!important}
+#outline{top:105px!important;max-height:calc(100vh - 105px)!important;padding:18px 12px!important;background:var(--ui-panel)!important}
+.sidebar-label{margin:0 8px 10px!important;text-transform:none;letter-spacing:0!important;font-size:11px!important;color:var(--ui-text)!important}
+#tree{gap:2px!important}
+#tree>a,#tree>span{padding:8px 10px!important;border-radius:7px!important}
+.sidebar-help{background:transparent!important;border-top:1px solid var(--ui-border);border-radius:0!important;margin:18px 6px 0!important;padding:13px 2px!important}
+#content{padding:24px 28px 56px!important}
+.document-head{margin-bottom:12px!important}
+.document-head h1{font-size:23px!important;margin:0!important}
+#summary{gap:8px!important;margin-bottom:14px!important}
+.metric{padding:12px!important;border-radius:10px!important;box-shadow:none!important}
+#summary .metric{border-top:1px solid var(--ui-border)!important}
+#items{border-radius:11px!important;box-shadow:none!important}
+@media(max-width:1020px){#explorer{grid-template-columns:1fr!important}#outline{max-height:none!important}#content{padding:20px 16px 44px!important}}
