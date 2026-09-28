@@ -233,7 +233,7 @@ try {
   assert.equal(hits('/llms.txt'),2,'The manually triggered rerun must execute once.');
   assert.equal(hits('/feeds/parts-compatibility-honda.json.gz'),2,
     'Manual rerun must perform compatibility validation exactly once again.');
-  const langFinding=page.locator('#findings .finding').filter({hasText:'PCL-LANG'}).first();
+  const langFinding=page.locator('#findings .test').filter({hasText:'PCL-LANG'}).first();
   assert.match(await langFinding.innerText(),/FAIL/,
     'Configured expected language coverage must turn the missing language into FAIL.');
 
@@ -266,7 +266,7 @@ try {
   assert.equal(hits('/robots.txt'),1,'One popup click must start exactly one SEO scan.');
   const seoPass=Number(await seoPage.locator('#passed').innerText());
   assert.ok(seoPass>=3,'SEO must crawl a real XML sitemap and page.');
-  const seoMetaFinding=seoPage.locator('#findings .finding').filter({hasText:'-META'}).first();
+  const seoMetaFinding=seoPage.locator('#findings .test').filter({hasText:'-META'}).first();
   assert.match(await seoMetaFinding.innerText(),/FAIL/,
     'Required SEO metadata config must promote a missing description from warning to FAIL.');
   console.log('SEO autorun smoke PASS: '+seoPass+' live checks with required metadata policy.');
