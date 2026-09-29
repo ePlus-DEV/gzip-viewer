@@ -3,7 +3,7 @@
 
 import {Moon, Sun} from "lucide-react";
 import {motion, useReducedMotion} from "motion/react";
-import {useCallback} from "react";
+import {useCallback, useRef} from "react";
 
 export type ThemeMode = "light" | "dark";
 
@@ -15,13 +15,17 @@ interface ThemeToggleProps {
 
 export function ThemeToggle({theme,onThemeChange,className=""}:ThemeToggleProps){
   const reduce=useReducedMotion();
+  const transitioning=useRef(false);
   const dark=theme==="dark";
 
   const toggle=useCallback((event:React.MouseEvent<HTMLButtonElement>)=>{
+    if(transitioning.current)return;
+    transitioning.current=true;
     const next:ThemeMode=dark?"light":"dark";
     const doc=document as Document & {startViewTransition?: (cb:()=>void)=>{ready:Promise<void>}};
     if(reduce || !doc.startViewTransition){
       onThemeChange(next);
+      window.setTimeout(()=>{transitioning.current=false;},180);
       return;
     }
     const {clientX:x,clientY:y}=event;
@@ -32,7 +36,7 @@ export function ThemeToggle({theme,onThemeChange,className=""}:ThemeToggleProps)
         {clipPath:[`circle(0px at ${x}px ${y}px)`,`circle(${radius}px at ${x}px ${y}px)`]},
         {duration:420,easing:"cubic-bezier(.16,1,.3,1)",pseudoElement:"::view-transition-new(root)"}
       );
-    }).catch(()=>{});
+    }).catch(()=>{}).finally(()=>{window.setTimeout(()=>{transitioning.current=false;},80);});
   },[dark,onThemeChange,reduce]);
 
   return <motion.button type="button" aria-label={dark?"Use light mode":"Use dark mode"}
