@@ -217,7 +217,7 @@ function App() {
           <div className="workspace-title"><div><h1>Audit</h1><p>Configure, run and review website checks.</p></div></div>
 
           {startupError && <div className="startup-error" role="alert">{startupError}</div>}
-          <section className="panel configuration-panel" id="audit-config" aria-labelledby="mode-heading">
+          <section className={"panel configuration-panel "+(runState.running?"audit-running":"")} id="audit-config" aria-labelledby="mode-heading" aria-busy={runState.running}>
             <div className="panel-heading"><div className="heading-icon"><Bot size={19}/></div>
               <div><h2 id="mode-heading">Choose an audit</h2><p>Two specialized suites, one reporting workspace.</p></div>
               
@@ -227,7 +227,7 @@ function App() {
                 <input type="radio" name="audit-mode" value="aeo" defaultChecked={initialMode==='aeo'} tabIndex={-1}/>
                 <input type="radio" name="audit-mode" value="seo" defaultChecked={initialMode==='seo'} tabIndex={-1}/>
               </div>
-              <RadioGroup value={auditModeUi} onValueChange={value=>changeAuditMode(value as 'aeo'|'seo')}
+              <RadioGroup value={auditModeUi} onValueChange={value=>{if(!runState.running)changeAuditMode(value as 'aeo'|'seo')}}
                 orientation="horizontal" className="mode-cards">
                 <RadioGroupItem value="aeo" ariaLabel="AEO Audit" className="mode-card"
                   label={<>
@@ -255,18 +255,18 @@ function App() {
               
             </div>
             <label htmlFor="site" className="input-label">Audit entry point</label>
-            <Input id="site" type="url" value={site} onChange={setSite}
+            <Input id="site" type="url" value={site} onChange={value=>{if(!runState.running)setSite(value)}}
               autoComplete="url" placeholder="https://example.com"
               leftIcon={<Globe2 size={17}/>} className="audit-site-input"
               classNames={{field:"url-field",input:"audit-site-text"}} required/>
             <div className="settings">
-              <LegacyBoundSelect id="scope" label="Scan scope" defaultValue="quick"
+              <div className={runState.running?"audit-control-lock":""}><LegacyBoundSelect id="scope" label="Scan scope" defaultValue="quick"
                 options={[
                   {value:'quick',label:'⚡ Quick — representative sample'},
                   {value:'full',label:'◈ Full — published resources (safety caps)'},
-                ]}/>
-              <LegacyBoundSelect id="reference" label="Reference language" defaultValue="en"
-                className="aeo-only" options={[{value:'en',label:'en (default)'}]}/>
+                ]}/></div>
+              <div className={runState.running?"audit-control-lock":""}><LegacyBoundSelect id="reference" label="Reference language" defaultValue="en"
+                className="aeo-only" options={[{value:'en',label:'en (default)'}]}/></div>
             </div>
             <BouncyAccordion
               items={[{
@@ -280,12 +280,12 @@ function App() {
             />
             <div className="validation-launch">
               <Button type="button" variant="outline" size="md" className="validation-launch-button"
-                onClick={()=>setValidationOpen(true)}>
+                disabled={runState.running} onClick={()=>setValidationOpen(true)}>
                 <SlidersHorizontal size={16}/>
                 <span><strong>Validation settings</strong><small>SEO &amp; AEO policies, limits and thresholds</small></span>
               </Button>
             </div>
-            <Drawer open={validationOpen} onOpenChange={setValidationOpen} side="right"
+            <Drawer open={validationOpen && !runState.running} onOpenChange={open=>{if(!runState.running)setValidationOpen(open)}} side="right"
               ariaLabel="SEO and AEO validation settings" className="validation-drawer">
               <div className="validation-drawer-header">
                 <div><span className="section-kicker">AUDIT POLICY</span>
