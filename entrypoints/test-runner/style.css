@@ -671,3 +671,14 @@ progress{height:10px;accent-color:#20b89b;border-radius:99px}
 .audit-header-actions .explore-nav{background:transparent!important;border:1px solid var(--ui-border)!important;color:var(--ui-text)!important}
 .audit-header-actions .explore-nav:hover{background:var(--ui-muted)!important}
 @media(max-width:760px){.audit-content{padding:18px 14px 44px!important}.workspace-title{margin-bottom:14px}}
+
+/* Freeze run-defining controls while an audit is active. Stop remains available. */
+.audit-running .mode-cards,
+.audit-running .audit-site-input,
+.audit-control-lock{
+  pointer-events:none;
+  opacity:.58;
+  cursor:not-allowed;
+}
+.audit-running .mode-cards{filter:saturate(.72)}
+.audit-running .audit-site-input input{cursor:not-allowed}
